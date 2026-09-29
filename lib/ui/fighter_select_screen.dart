@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../data/cosmetics.dart';
 import '../data/roster.dart';
 import '../game/fighter_art.dart';
 import 'theme.dart';
@@ -14,7 +15,11 @@ class FighterSelectScreen extends StatefulWidget {
     required this.roster,
     required this.onFight,
     this.onTap,
+    this.skinFor,
   });
+
+  /// The equipped skin to preview on each card (null = default look).
+  final Skin Function(String fighterId)? skinFor;
 
   final List<RosterEntry> roster;
   final ValueChanged<RosterEntry> onFight;
@@ -74,6 +79,7 @@ class _FighterSelectScreenState extends State<FighterSelectScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: _FighterCard(
                             entry: entry,
+                            skin: widget.skinFor?.call(entry.id),
                             picked: _picked?.id == entry.id,
                             weightFraction: entry.def.weight / maxWeight,
                             speedFraction:
@@ -117,6 +123,7 @@ class _FighterSelectScreenState extends State<FighterSelectScreen> {
 class _FighterCard extends StatelessWidget {
   const _FighterCard({
     required this.entry,
+    required this.skin,
     required this.picked,
     required this.weightFraction,
     required this.speedFraction,
@@ -124,6 +131,7 @@ class _FighterCard extends StatelessWidget {
   });
 
   final RosterEntry entry;
+  final Skin? skin;
   final bool picked;
   final double weightFraction;
   final double speedFraction;
@@ -149,7 +157,7 @@ class _FighterCard extends StatelessWidget {
           children: [
             Expanded(
               child: CustomPaint(
-                painter: _PreviewPainter(entry, picked),
+                painter: _PreviewPainter(entry, skin, picked),
                 child: const SizedBox.expand(),
               ),
             ),
@@ -222,9 +230,10 @@ class _Stat extends StatelessWidget {
 }
 
 class _PreviewPainter extends CustomPainter {
-  _PreviewPainter(this.entry, this.picked);
+  _PreviewPainter(this.entry, this.skin, this.picked);
 
   final RosterEntry entry;
+  final Skin? skin;
   final bool picked;
 
   @override
@@ -244,10 +253,12 @@ class _PreviewPainter extends CustomPainter {
       height: h,
       rim: picked ? BrawlColors.accent : BrawlColors.player,
       weapon: weaponArtFor(entry.id),
+      skin: skin,
     );
     canvas.restore();
   }
 
   @override
-  bool shouldRepaint(_PreviewPainter old) => old.picked != picked;
+  bool shouldRepaint(_PreviewPainter old) =>
+      old.picked != picked || old.skin?.id != skin?.id;
 }

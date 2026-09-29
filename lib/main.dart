@@ -23,6 +23,7 @@ Future<void> main() async {
 
   final sounds = FlameSounds();
   final roster = await BrawlApp.loadRoster();
+  final cosmetics = await BrawlApp.loadCosmetics(roster);
   try {
     await sounds.load();
   } catch (e) {
@@ -32,6 +33,7 @@ Future<void> main() async {
   runApp(
     BrawlApp(
       roster: roster,
+      cosmetics: cosmetics,
       sounds: sounds,
       showTouchControls: isPhone || _forceTouchControls,
     ),

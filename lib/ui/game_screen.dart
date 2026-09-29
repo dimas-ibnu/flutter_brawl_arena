@@ -1,7 +1,9 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
+import '../data/cosmetics.dart';
 import '../data/roster.dart';
+import '../game/stage_art.dart';
 import '../game/brawl_game.dart';
 import '../game/sounds.dart';
 import 'theme.dart';
@@ -17,7 +19,14 @@ class GameScreen extends StatefulWidget {
     required this.seed,
     required this.sounds,
     required this.showTouchControls,
+    this.playerSkin,
+    this.opponentSkin,
+    this.palette = sunsetPalette,
   });
+
+  final Skin? playerSkin;
+  final Skin? opponentSkin;
+  final StagePalette palette;
 
   final RosterEntry player;
   final RosterEntry opponent;
@@ -34,6 +43,9 @@ class _GameScreenState extends State<GameScreen> {
     player: widget.player,
     opponent: widget.opponent,
     seed: widget.seed,
+    playerSkin: widget.playerSkin,
+    opponentSkin: widget.opponentSkin,
+    palette: widget.palette,
     sounds: widget.sounds,
     showKeyboardHints: !widget.showTouchControls,
   );

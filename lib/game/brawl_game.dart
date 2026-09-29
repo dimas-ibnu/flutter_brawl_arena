@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../ai/bot.dart';
+import '../data/cosmetics.dart';
 import '../data/roster.dart';
 import '../input/keyboard_input.dart';
 import '../input/touch_input.dart';
@@ -29,13 +30,17 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     required this.player,
     required this.opponent,
     required this.seed,
+    this.playerSkin,
+    this.opponentSkin,
+    StagePalette palette = sunsetPalette,
     GameSounds? sounds,
     this.showKeyboardHints = true,
   }) : sounds = sounds ?? SilentSounds(),
        sim = MatchSimulation(
          stage: StageDef.flatArena,
          fighterDefs: [player.def, opponent.def],
-       ) {
+       ),
+       _backdrop = StageBackdrop(palette) {
     _bot = Bot(sim: sim, slot: 1, seed: seed);
     _newMatch();
   }
@@ -43,6 +48,10 @@ class BrawlGame extends FlameGame with KeyboardEvents {
   final RosterEntry player;
   final RosterEntry opponent;
   final int seed;
+
+  /// Cosmetics: visual only, never passed to the simulation.
+  final Skin? playerSkin;
+  final Skin? opponentSkin;
   final GameSounds sounds;
   final bool showKeyboardHints;
   final MatchSimulation sim;
@@ -79,7 +88,12 @@ class BrawlGame extends FlameGame with KeyboardEvents {
   final _sparks = <_Spark>[];
   final _fx = math.Random();
   double _shake = 0;
-  final _backdrop = StageBackdrop();
+  final StageBackdrop _backdrop;
+
+  /// Recent weapon-tip positions per fighter, for skin weapon trails.
+  final _trails = [<Offset>[], <Offset>[]];
+
+  Skin? _skinOf(int slot) => slot == 0 ? playerSkin : opponentSkin;
 
   static const _slotColors = [Color(0xFF4FC3F7), Color(0xFFFF8A65)];
 
@@ -97,6 +111,9 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     _bot.reset();
     touchInput.reset();
     _sparks.clear();
+    for (final t in _trails) {
+      t.clear();
+    }
     _shake = 0;
     _replay = Replay(
       seed: seed,
@@ -163,6 +180,8 @@ class BrawlGame extends FlameGame with KeyboardEvents {
       final now = _state.fighters[i];
       final was = _before[i];
       final def = sim.fighterDefs[i];
+      // In a 1v1 the other fighter caused it; their skin colors the effect.
+      final other = _skinOf(1 - i);
       if (now.stocks < was.stocks) {
         _shake = 16;
         sounds.play(Sfx.ko);
@@ -172,7 +191,8 @@ class BrawlGame extends FlameGame with KeyboardEvents {
             was.y.clamp(-500, 200),
           ),
           40,
-          Colors.white,
+          other?.koColor ?? Colors.white,
+          SparkShape.dot,
         );
       } else if (now.damage > was.damage) {
         final heavy = _state.hitFreeze > 0;
@@ -184,7 +204,9 @@ class BrawlGame extends FlameGame with KeyboardEvents {
             now.y.toDouble() - def.height.toDouble() / 2,
           ),
           heavy ? 22 : 10,
-          heavy ? const Color(0xFFFFD54F) : const Color(0xFFFFF3C4),
+          other?.sparkColor ??
+              (heavy ? const Color(0xFFFFD54F) : const Color(0xFFFFF3C4)),
+          other?.sparkShape ?? SparkShape.dot,
         );
       } else if (now.dodgeFrame == 1) {
         sounds.play(Sfx.dodge);
@@ -198,7 +220,7 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     }
   }
 
-  void _burst(Offset at, int count, Color color) {
+  void _burst(Offset at, int count, Color color, SparkShape shape) {
     for (var i = 0; i < count; i++) {
       final angle = _fx.nextDouble() * math.pi * 2;
       final speed = 3 + _fx.nextDouble() * 9;
@@ -208,6 +230,7 @@ class BrawlGame extends FlameGame with KeyboardEvents {
           Offset(math.cos(angle), math.sin(angle)) * speed,
           0.25 + _fx.nextDouble() * 0.3,
           color,
+          shape,
         ),
       );
     }
@@ -271,20 +294,62 @@ class BrawlGame extends FlameGame with KeyboardEvents {
       stage.groundLeft.toDouble(),
       stage.groundRight.toDouble(),
       stage.groundY.toDouble(),
+      _backdrop.palette,
     );
     for (var i = 0; i < _state.fighters.length; i++) {
       _renderFighter(canvas, i);
     }
     for (final s in _sparks) {
-      canvas.drawCircle(
-        s.pos,
-        3 + s.life * 6,
-        Paint()..color = s.color.withValues(alpha: (s.life * 3).clamp(0, 1)),
-      );
+      _paintSpark(canvas, s);
     }
     canvas.restore();
 
     _renderHud(canvas);
+  }
+
+  void _paintSpark(Canvas canvas, _Spark s) {
+    final paint = Paint()
+      ..color = s.color.withValues(alpha: (s.life * 3).clamp(0, 1));
+    final r = 3 + s.life * 6;
+    switch (s.shape) {
+      case SparkShape.dot:
+        canvas.drawCircle(s.pos, r, paint);
+      case SparkShape.star:
+        final path = Path();
+        for (var i = 0; i < 10; i++) {
+          final a = i * math.pi / 5 - math.pi / 2;
+          final d = i.isEven ? r * 1.6 : r * 0.6;
+          final pt = s.pos + Offset(math.cos(a), math.sin(a)) * d;
+          i == 0 ? path.moveTo(pt.dx, pt.dy) : path.lineTo(pt.dx, pt.dy);
+        }
+        canvas.drawPath(path..close(), paint);
+      case SparkShape.shard:
+        final dir = s.vel.distance == 0
+            ? const Offset(1, 0)
+            : s.vel / s.vel.distance;
+        canvas.drawLine(
+          s.pos - dir * r * 1.5,
+          s.pos + dir * r * 1.5,
+          paint
+            ..strokeWidth = r * 0.6
+            ..strokeCap = StrokeCap.round,
+        );
+    }
+  }
+
+  void _renderTrail(Canvas canvas, List<Offset> trail, Color color) {
+    for (var i = 1; i < trail.length; i++) {
+      final t = i / trail.length;
+      canvas.drawLine(
+        trail[i - 1],
+        trail[i],
+        Paint()
+          ..color = color.withValues(alpha: t * 0.8)
+          ..strokeWidth = 4 + t * 10
+          ..strokeCap = StrokeCap.round
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+      );
+    }
   }
 
   void _renderFighter(Canvas canvas, int slot) {
@@ -312,13 +377,19 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     }
     final running = f.grounded && f.vx.abs().toDouble() > 1;
     final flash = f.hitstun > 0 && (f.hitstun ~/ 3).isEven;
+    final skin = _skinOf(slot);
+    final trail = _trails[slot];
+    if (skin?.trailColor != null && trail.length > 1) {
+      _renderTrail(canvas, trail, skin!.trailColor!);
+    }
 
-    paintFighter(
+    final tip = paintFighter(
       canvas,
       feet: Offset(x, y),
       width: def.width.toDouble(),
       height: def.height.toDouble(),
-      rim: flash ? Colors.white : _slotColors[slot],
+      rim: _slotColors[slot],
+      skin: flash ? _flashSkin(skin) : skin,
       weapon: weaponArtFor(slot == 0 ? player.id : opponent.id),
       opacity: f.dodgeFrame > 0 ? 0.35 : 1,
       pose: FighterPose(
@@ -328,7 +399,29 @@ class BrawlGame extends FlameGame with KeyboardEvents {
         reach: reach,
         windUp: windUp,
         stunned: f.hitstun > 0,
+        speedX: f.vx.toDouble(),
       ),
+    );
+
+    // Weapon trail: remember the tip while an attack is out.
+    if (skin != null && skin.trailLength > 0 && reach != null) {
+      trail.add(tip);
+      while (trail.length > skin.trailLength) {
+        trail.removeAt(0);
+      }
+    } else if (trail.isNotEmpty) {
+      trail.removeAt(0);
+    }
+
+    // Marker above the head: blue = you, orange = bot, whatever the skin.
+    final top = Offset(x, y - def.height.toDouble() - 26);
+    canvas.drawPath(
+      Path()
+        ..moveTo(top.dx - 9, top.dy - 10)
+        ..lineTo(top.dx + 9, top.dy - 10)
+        ..lineTo(top.dx, top.dy)
+        ..close(),
+      Paint()..color = _slotColors[slot],
     );
 
     if (debugView && attack != null && box != null) {
@@ -450,6 +543,19 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     }
   }
 
+  /// Hit flash: the same skin with a white rim.
+  static Skin _flashSkin(Skin? skin) => Skin(
+    id: skin?.id ?? 'flash',
+    name: '',
+    fighterId: skin?.fighterId ?? '',
+    rim: Colors.white,
+    body: skin?.body,
+    weaponColor: skin?.weaponColor,
+    weaponGlow: skin?.weaponGlow ?? 0,
+    weaponLength: skin?.weaponLength ?? 1,
+    accessories: skin?.accessories ?? const [],
+  );
+
   // ---------------------------------------------------------------------------
   // Keyboard
 
@@ -506,10 +612,11 @@ class _Seen {
 }
 
 class _Spark {
-  _Spark(this.pos, this.vel, this.life, this.color);
+  _Spark(this.pos, this.vel, this.life, this.color, this.shape);
 
   Offset pos;
   Offset vel;
   double life;
   final Color color;
+  final SparkShape shape;
 }

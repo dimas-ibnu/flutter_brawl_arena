@@ -4,9 +4,10 @@ import '../game/stage_art.dart';
 import 'theme.dart';
 
 class TitleScreen extends StatelessWidget {
-  const TitleScreen({super.key, required this.onPlay});
+  const TitleScreen({super.key, required this.onPlay, this.onLocker});
 
   final VoidCallback onPlay;
+  final VoidCallback? onLocker;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +42,15 @@ class TitleScreen extends StatelessWidget {
                     onPressed: onPlay,
                     child: const Text('Play vs Bot'),
                   ),
+                  if (onLocker != null) ...[
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      key: const Key('locker'),
+                      onPressed: onLocker,
+                      icon: const Icon(Icons.checkroom),
+                      label: const Text('Locker'),
+                    ),
+                  ],
                 ],
               ),
             ),
