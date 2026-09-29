@@ -51,27 +51,100 @@ void _faceOff(GameState state) {
 }
 
 void main() {
-  group('stocks', () {
-    test('losing a stock respawns you with 2 s of invincibility', () {
+  group('stocks and respawning', () {
+    test('losing a stock takes you out of play for the respawn delay', () {
       final (sim, state) = _setup();
       final ranger = state.fighters[1];
       _knockOut(ranger, sim);
       sim.step(state, _idle);
       expect(ranger.stocks, sim.startingStocks - 1);
-      expect(ranger.invincible, sim.respawnInvincibleTicks);
       expect(ranger.damage, 0);
+      expect(ranger.inPlay, isFalse);
+      expect(ranger.respawnTimer, sim.respawnDelayTicks);
+      expect(sim.respawnDelayTicks, inInclusiveRange(60, 120), reason: '1-2 s');
     });
 
-    test('hits pass through a respawning fighter', () {
+    test('while waiting, the fighter ignores input and cannot lose stocks', () {
       final (sim, state) = _setup();
       final ranger = state.fighters[1];
       _knockOut(ranger, sim);
       sim.step(state, _idle);
-      _run(sim, state, 60); // land on the stage, still invincible
+      final parked = (ranger.x, ranger.y);
+      _run(sim, state, sim.respawnDelayTicks - 1, [
+        InputFrame.none,
+        InputFrame.of([Button.right, Button.jump]),
+      ]);
+      expect((ranger.x, ranger.y), parked);
+      expect(ranger.stocks, sim.startingStocks - 1);
+      expect(ranger.inPlay, isFalse);
+    });
+
+    test('after the delay it drops in above the stage, invincible', () {
+      final (sim, state) = _setup();
+      final ranger = state.fighters[1];
+      _knockOut(ranger, sim);
+      sim.step(state, _idle);
+      _run(sim, state, sim.respawnDelayTicks);
+      expect(ranger.inPlay, isTrue);
+      expect(ranger.invincible, greaterThan(0));
+      expect(ranger.y < sim.stage.groundY, isTrue, reason: 'above the stage');
+      expect(
+        ranger.x >= sim.stage.groundLeft + MatchSimulation.spawnEdgeMargin,
+        isTrue,
+      );
+      expect(
+        ranger.x <= sim.stage.groundRight - MatchSimulation.spawnEdgeMargin,
+        isTrue,
+      );
+    });
+
+    Fx dropX(int seed, {int opponentX = 0}) {
+      final sim = MatchSimulation(
+        stage: StageDef.flatArena,
+        fighterDefs: [knightDef, rangerDef],
+      );
+      final state = sim.initialState(seed: seed);
+      _run(sim, state, 120);
+      state.fighters[0].x = Fx.fromInt(opponentX);
+      _knockOut(state.fighters[1], sim);
+      sim.step(state, _idle);
+      _run(sim, state, sim.respawnDelayTicks);
+      return state.fighters[1].x;
+    }
+
+    test('the drop point is random', () {
+      final spots = {for (var seed = 1; seed <= 20; seed++) dropX(seed)};
+      expect(spots.length, greaterThan(10));
+    });
+
+    test('the drop point is never right above the opponent', () {
+      for (var seed = 1; seed <= 60; seed++) {
+        for (final opponentX in [-300, 0, 300]) {
+          final gap =
+              (dropX(seed, opponentX: opponentX) - Fx.fromInt(opponentX)).abs();
+          expect(
+            gap >= MatchSimulation.minSpawnDistance,
+            isTrue,
+            reason: 'seed $seed, opponent at $opponentX, gap ${gap.toDouble()}',
+          );
+        }
+      }
+    });
+
+    test('the same seed always drops at the same spot (replays agree)', () {
+      expect(dropX(7), dropX(7));
+    });
+
+    test('hits pass through a fighter that just dropped in', () {
+      final (sim, state) = _setup();
+      final ranger = state.fighters[1];
+      _knockOut(ranger, sim);
+      sim.step(state, _idle);
+      _run(sim, state, sim.respawnDelayTicks + 60); // drop and land
+      expect(ranger.invincible, greaterThan(0));
       _faceOff(state);
       sim.step(state, _jab);
       _run(sim, state, 10);
-      expect(ranger.invincible, greaterThan(0));
       expect(ranger.damage, 0);
     });
 
@@ -80,7 +153,7 @@ void main() {
       final ranger = state.fighters[1];
       _knockOut(ranger, sim);
       sim.step(state, _idle);
-      _run(sim, state, sim.respawnInvincibleTicks);
+      _run(sim, state, sim.respawnDelayTicks + sim.respawnInvincibleTicks);
       expect(ranger.invincible, 0);
       _faceOff(state);
       sim.step(state, _jab);
@@ -94,6 +167,7 @@ void main() {
       final (sim, state) = _setup();
       final ranger = state.fighters[1];
       for (var i = 0; i < sim.startingStocks; i++) {
+        _run(sim, state, sim.respawnDelayTicks + 1);
         _knockOut(ranger, sim);
         sim.step(state, _idle);
       }
@@ -102,7 +176,6 @@ void main() {
       expect(state.finished, isTrue);
       expect(state.winner, 0);
     });
-
     test('the state stops changing after the match ends', () {
       final (sim, state) = _setup();
       state.fighters[1].stocks = 1;

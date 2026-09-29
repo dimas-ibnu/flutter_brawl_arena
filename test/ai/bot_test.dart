@@ -246,6 +246,23 @@ void main() {
     });
   });
 
+  test('heads to the middle while the opponent waits to respawn', () {
+    final sim = _sim();
+    final state = _landed(sim, knightX: 0, botX: 400);
+    // Knock the Knight out over the right edge, near the bot.
+    state.fighters[0]
+      ..x = sim.stage.blastRight + Fx.fromInt(10)
+      ..grounded = false;
+    final bot = Bot(sim: sim, slot: 1);
+    _play(sim, state, bot, sim.respawnDelayTicks - 5);
+    expect(state.fighters[0].inPlay, isFalse);
+    expect(
+      state.fighters[1].x.abs() < Fx.fromInt(120),
+      isTrue,
+      reason: 'not camping at the edge (x ${state.fighters[1].x.toDouble()})',
+    );
+  });
+
   group('determinism', () {
     (int, int) botMatch() {
       final sim = _sim();

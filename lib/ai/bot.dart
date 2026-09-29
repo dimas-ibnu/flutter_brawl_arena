@@ -138,7 +138,7 @@ class Bot {
     if (_seen.length > profile.reactionTicks + 1) _seen.removeAt(0);
 
     final out = _Out(_last);
-    if (!state.finished && !me.eliminated) _decide(me, _seen.first, out);
+    if (!state.finished && me.inPlay) _decide(me, _seen.first, out);
     _last = out.frame;
     return _last;
   }
@@ -154,6 +154,13 @@ class Bot {
     }
     final busy = me.hitstun > 0 || me.attackFrame > 0 || me.dodgeFrame > 0;
     if (busy || them.eliminated) return;
+
+    // The opponent is waiting to respawn at an unknown spot: head to the
+    // middle instead of camping where they fell.
+    if (them.respawnTimer > 0) {
+      _walkTo(me, _center, out);
+      return;
+    }
 
     final toward = them.x > me.x ? 1 : (them.x < me.x ? -1 : me.facing);
 

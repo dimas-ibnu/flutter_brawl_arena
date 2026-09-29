@@ -15,7 +15,14 @@ class MatchSimulation {
     this.startingStocks = 3,
     this.timeLimitTicks = 4 * 60 * ticksPerSecond,
     this.respawnInvincibleTicks = 2 * ticksPerSecond,
+    this.respawnDelayTicks = 90,
   });
+
+  /// Respawn drop points stay this far in from the stage edges, and at
+  /// least [minSpawnDistance] from any opponent when possible.
+  static const Fx spawnEdgeMargin = Fx.fromInt(80);
+  static const Fx minSpawnDistance = Fx.fromInt(250);
+  static const int _spawnTries = 16;
 
   static const int ticksPerSecond = 60;
 
@@ -28,8 +35,12 @@ class MatchSimulation {
   /// Match length (4 minutes by default).
   final int timeLimitTicks;
 
-  /// Invincibility after respawning (2 seconds by default).
+  /// Invincibility after dropping back in (2 seconds by default).
   final int respawnInvincibleTicks;
+
+  /// Time out of play after losing a stock, before dropping back in
+  /// (1.5 seconds by default).
+  final int respawnDelayTicks;
 
   /// Ticks left on the match clock.
   int ticksLeft(GameState state) =>
@@ -68,7 +79,12 @@ class MatchSimulation {
     }
     for (var i = 0; i < state.fighters.length; i++) {
       final f = state.fighters[i];
-      if (!f.eliminated) _stepFighter(f, fighterDefs[i], inputs[i], i);
+      if (f.eliminated) continue;
+      if (f.respawnTimer > 0) {
+        if (--f.respawnTimer == 0) _dropIn(state, i);
+        continue;
+      }
+      _stepFighter(f, fighterDefs[i], inputs[i], i);
     }
     _resolveHits(state);
     state.frame++;
@@ -285,9 +301,7 @@ class MatchSimulation {
     final hits = <(int, int)>[];
     for (var a = 0; a < fighters.length; a++) {
       final attacker = fighters[a];
-      if (attacker.eliminated ||
-          attacker.attackFrame == 0 ||
-          attacker.attackHit) {
+      if (!attacker.inPlay || attacker.attackFrame == 0 || attacker.attackHit) {
         continue;
       }
       final attack = _moveOf(attacker, fighterDefs[a]);
@@ -296,7 +310,7 @@ class MatchSimulation {
       for (var t = 0; t < fighters.length; t++) {
         final target = fighters[t];
         if (t == a ||
-            target.eliminated ||
+            !target.inPlay ||
             target.dodgeFrame > 0 ||
             target.invincible > 0) {
           continue;
@@ -375,12 +389,16 @@ class MatchSimulation {
       f.y < stage.blastTop ||
       f.y > stage.blastBottom;
 
+  // Takes the fighter out of play. It drops back in after
+  // respawnDelayTicks at a random spot (see _dropIn).
   void _loseStock(FighterState f, FighterDef def, int slot) {
     f.stocks--;
-    f.invincible = f.eliminated ? 0 : respawnInvincibleTicks;
+    f.respawnTimer = f.eliminated ? 0 : respawnDelayTicks;
+    f.invincible = 0;
     f.damage = 0;
-    f.x = stage.spawnX[slot];
-    f.y = stage.spawnY;
+    // Parked out of sight above the stage until the drop.
+    f.x = Fx.zero;
+    f.y = stage.blastTop - Fx.fromInt(200);
     f.vx = Fx.zero;
     f.vy = Fx.zero;
     f.grounded = false;
@@ -391,6 +409,44 @@ class MatchSimulation {
     f.dodgeCooldown = 0;
     f.airDodgeUsed = false;
     f.recoveryUsed = false;
+    f.lastInput = InputFrame.none;
+  }
+
+  /// Drops a respawning fighter above the stage at a random x, re-rolled
+  /// when it lands near an opponent so nobody can wait under the spawn.
+  /// Uses the match's seeded generator, so replays and online peers agree.
+  void _dropIn(GameState state, int slot) {
+    final f = state.fighters[slot];
+    final left = stage.groundLeft + spawnEdgeMargin;
+    final range = (stage.groundRight - spawnEdgeMargin - left).floorToInt();
+    Fx distanceToNearest(Fx x) {
+      var nearest = Fx.fromInt(1 << 14);
+      for (var i = 0; i < state.fighters.length; i++) {
+        final o = state.fighters[i];
+        if (i == slot || !o.inPlay) continue;
+        nearest = Fx.min(nearest, (o.x - x).abs());
+      }
+      return nearest;
+    }
+
+    var best = left;
+    var bestDistance = Fx.fromInt(-1);
+    for (var i = 0; i < _spawnTries; i++) {
+      final x = left + Fx.fromInt(state.nextRandom(range + 1));
+      final d = distanceToNearest(x);
+      if (d > bestDistance) {
+        best = x;
+        bestDistance = d;
+      }
+      if (d >= minSpawnDistance) break;
+    }
+
+    f.x = best;
+    f.y = stage.spawnY;
+    f.vx = Fx.zero;
+    f.vy = Fx.zero;
+    f.facing = best > (stage.groundLeft + stage.groundRight).divInt(2) ? -1 : 1;
+    f.invincible = respawnInvincibleTicks;
   }
 }
 

@@ -22,6 +22,7 @@ class FighterState {
     this.airDodgeUsed = false,
     this.recoveryUsed = false,
     this.invincible = 0,
+    this.respawnTimer = 0,
     this.damage = 0,
     required this.stocks,
     this.lastInput = InputFrame.none,
@@ -65,8 +66,15 @@ class FighterState {
   /// Ticks of respawn invincibility left. Can't be hit while above 0.
   int invincible;
 
+  /// Ticks left before dropping back in after losing a stock. While above
+  /// 0 the fighter is out of play: not drawn, can't act, can't be hit.
+  int respawnTimer;
+
   /// Out of stocks: no longer in the match.
   bool get eliminated => stocks <= 0;
+
+  /// On the stage (or flying around it) and able to act and be hit.
+  bool get inPlay => !eliminated && respawnTimer == 0;
 
   /// Damage percent. Higher damage means bigger knockback.
   int damage;
@@ -92,6 +100,7 @@ class FighterState {
     airDodgeUsed: airDodgeUsed,
     recoveryUsed: recoveryUsed,
     invincible: invincible,
+    respawnTimer: respawnTimer,
     damage: damage,
     stocks: stocks,
     lastInput: lastInput,
@@ -114,6 +123,7 @@ class FighterState {
     ..add(airDodgeUsed ? 1 : 0)
     ..add(recoveryUsed ? 1 : 0)
     ..add(invincible)
+    ..add(respawnTimer)
     ..add(damage)
     ..add(stocks)
     ..add(lastInput.bits);

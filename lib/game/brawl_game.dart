@@ -249,7 +249,7 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     // Camera: frame the fighters still in the match, eased so it never jumps.
     final alive = [
       for (final f in _state.fighters)
-        if (!f.eliminated) f,
+        if (f.inPlay) f,
     ];
     if (alive.isNotEmpty) {
       final xs = [for (final f in alive) f.x.toDouble()];
@@ -355,7 +355,7 @@ class BrawlGame extends FlameGame with KeyboardEvents {
   void _renderFighter(Canvas canvas, int slot) {
     final f = _state.fighters[slot];
     final def = sim.fighterDefs[slot];
-    if (f.eliminated) return;
+    if (!f.inPlay) return;
     // Blink while respawn-invincible.
     if (f.invincible > 0 && (f.invincible ~/ 4).isOdd) return;
 
