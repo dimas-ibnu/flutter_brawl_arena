@@ -321,9 +321,14 @@ class MatchSimulation {
   }
 
   /// World-space hitbox of [attack] for [f] (used for hits and debug drawing).
-  static Box hitboxOf(FighterState f, AttackDef attack) {
-    final cx = f.x + attack.forward.mulInt(f.facing);
-    final cy = f.y - attack.up;
+  static Box hitboxOf(FighterState f, AttackDef attack) =>
+      hitboxAt(f.x, f.y, f.facing, attack);
+
+  /// Hitbox of [attack] for a fighter with feet at ([x], [y]) facing
+  /// [facing]. The bot uses this to check range before attacking.
+  static Box hitboxAt(Fx x, Fx y, int facing, AttackDef attack) {
+    final cx = x + attack.forward.mulInt(facing);
+    final cy = y - attack.up;
     final hw = attack.width.divInt(2);
     final hh = attack.height.divInt(2);
     return Box(cx - hw, cy - hh, cx + hw, cy + hh);
@@ -337,9 +342,12 @@ class MatchSimulation {
   AttackDef? currentMove(int slot, FighterState f) =>
       f.attackFrame == 0 ? null : _moveOf(f, fighterDefs[slot]);
 
-  static Box hurtboxOf(FighterState f, FighterDef def) {
+  static Box hurtboxOf(FighterState f, FighterDef def) =>
+      hurtboxAt(f.x, f.y, def);
+
+  static Box hurtboxAt(Fx x, Fx y, FighterDef def) {
     final hw = def.width.divInt(2);
-    return Box(f.x - hw, f.y - def.height, f.x + hw, f.y);
+    return Box(x - hw, y - def.height, x + hw, y);
   }
 
   static Fx _approach(Fx value, Fx target, Fx step) {
@@ -381,6 +389,9 @@ class Box {
   final Fx top;
   final Fx right;
   final Fx bottom;
+
+  /// This box grown by [by] on every side.
+  Box inflate(Fx by) => Box(left - by, top - by, right + by, bottom + by);
 
   bool overlaps(Box other) =>
       left < other.right &&

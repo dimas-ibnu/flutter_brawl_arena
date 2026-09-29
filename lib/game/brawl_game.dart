@@ -4,6 +4,7 @@ import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../ai/bot.dart';
 import '../input/keyboard_input.dart';
 import '../input/touch_input.dart';
 import '../sim/defs.dart';
@@ -19,12 +20,17 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     : _seed = seed,
       _sim = MatchSimulation(stage: StageDef.flatArena, fighterDefs: fighters) {
     _state = _sim.initialState(seed: seed);
+    _bot = Bot(sim: _sim, slot: 1, seed: seed);
   }
 
   final int _seed;
 
   final MatchSimulation _sim;
   late GameState _state;
+  late final Bot _bot;
+
+  /// Off = the opponent stands still as a training dummy (T toggles).
+  bool _botEnabled = true;
   final FixedStepClock _clock = FixedStepClock();
   InputFrame _keyboardInput = InputFrame.none;
 
@@ -40,6 +46,7 @@ class BrawlGame extends FlameGame with KeyboardEvents {
   /// Starts a fresh match with the same fighters.
   void restart() {
     _state = _sim.initialState(seed: _seed);
+    _bot.reset();
     touchInput.reset();
     result.value = null;
   }
@@ -81,8 +88,8 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     for (var i = 0; i < ticks; i++) {
       // Keyboard and touch can be used together.
       final player = InputFrame(_keyboardInput.bits | touchInput.frame.bits);
-      // Slot 1 is the training dummy: it stands still until the bot exists.
-      _sim.step(_state, [player, InputFrame.none]);
+      final opponent = _botEnabled ? _bot.think(_state) : InputFrame.none;
+      _sim.step(_state, [player, opponent]);
     }
     if (_state.finished && result.value == null) result.value = _state.winner;
   }
@@ -117,7 +124,8 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     _hud.render(
       canvas,
       'You (Knight) ${knight.damage}%  ${_stockDots(knight)}      '
-      'Dummy (Ranger) ${ranger.damage}%  ${_stockDots(ranger)}',
+      '${_botEnabled ? 'Bot' : 'Dummy'} (Ranger) ${ranger.damage}%  '
+      '${_stockDots(ranger)}',
       Vector2(16, 16),
     );
     final secondsLeft = (_sim.ticksLeft(_state) + 59) ~/ 60;
@@ -130,7 +138,7 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     _hud.render(
       canvas,
       'A/D move  Space/W jump  S fast fall  J light  K heavy  L dodge  '
-      '(hold a direction to change the move)  R reset   frame ${_state.frame}  '
+      '(hold a direction to change the move)  R reset  T bot/dummy   frame ${_state.frame}  '
       'checksum ${_state.checksum().toRadixString(16)}',
       Vector2(16, 38),
     );
@@ -192,6 +200,9 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     _keyboardInput = inputFromKeys(keysPressed);
     if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.keyR) {
       restart();
+    }
+    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.keyT) {
+      _botEnabled = !_botEnabled;
     }
     return KeyEventResult.handled;
   }
