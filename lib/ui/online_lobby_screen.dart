@@ -17,6 +17,7 @@ import '../net/signaling.dart';
 import '../net/transport.dart';
 import '../sim/defs.dart';
 import '../sim/match_simulation.dart';
+import '../sim/rules_fingerprint.dart';
 import 'game_screen.dart';
 import 'theme.dart';
 
@@ -125,7 +126,17 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
     final lobby = LobbyHandshake(
       transport: transport,
       isHost: isHost,
-      hello: HelloPacket(fighterId: widget.player.id, skinId: mySkin.id),
+      hello: HelloPacket(
+        fighterId: widget.player.id,
+        skinId: mySkin.id,
+        rules: rulesFingerprint(
+          MatchSimulation(
+            stage: StageDef.flatArena,
+            fighterDefs: [for (final e in widget.roster) e.def],
+          ),
+          [for (final e in widget.roster) e.def],
+        ),
+      ),
       makeStart: (guest) => StartPacket(
         seed: math.Random().nextInt(1 << 31) + 1,
         fighterIds: [widget.player.id, guest.fighterId],

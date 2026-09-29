@@ -95,6 +95,8 @@ void _expectInSync(_Online game) {
 }
 
 void main() {
+  _unevenRates();
+
   group('protocol', () {
     Packet roundTrip(Packet p) => Packet.decode(p.encode());
 
@@ -254,5 +256,56 @@ void main() {
       game.run(200);
       expect(game.peers[0].rttTicks, closeTo(12, 3));
     });
+  });
+}
+
+/// Regression: devices never tick in lockstep. When one side ran slower, the
+/// fast side's inputs arrived ahead of its clock and were pruned before use,
+/// so the first attack desynced ("Out of sync").
+void _unevenRates() {
+  group('uneven tick rates (real devices)', () {
+    for (final (label, rateB, delay, loss) in [
+      ('guest slower', 0.7, 3, 0),
+      ('guest much slower, lossy', 0.5, 6, 20),
+      ('guest in bursts', 1.6, 5, 10),
+    ]) {
+      test('$label stays in sync while both attack', () {
+        final net = FakeNetwork(
+          delayTicks: delay,
+          jitterTicks: 2,
+          lossPercent: loss,
+          seed: 4,
+        );
+        NetMatch peer(int slot) => NetMatch(
+          session: RollbackSession(sim: _sim(), seed: 3, localSlot: slot),
+          transport: slot == 0 ? net.a : net.b,
+        );
+        final peers = [peer(0), peer(1)];
+        final spam = [
+          Bot(sim: _sim(), slot: 0, seed: 1),
+          Bot(sim: _sim(), slot: 1, seed: 2),
+        ];
+        var owed = 0.0;
+        for (var t = 0; t < 2400; t++) {
+          peers[0].tick(spam[0].think(peers[0].state));
+          owed += rateB;
+          while (owed >= 1) {
+            peers[1].tick(spam[1].think(peers[1].state));
+            owed -= 1;
+          }
+          net.advance();
+        }
+        final a = peers[0].session.confirmedChecksums;
+        final b = peers[1].session.confirmedChecksums;
+        final common = a.keys.where(b.containsKey).toList();
+        expect(common.length, greaterThan(10));
+        for (final f in common) {
+          expect(a[f], b[f], reason: 'frame $f');
+        }
+        expect(peers.any((p) => p.desynced), isFalse);
+        final hits = peers[0].state.fighters.map((f) => f.damage + f.stocks);
+        expect(hits, isNotEmpty);
+      });
+    }
   });
 }

@@ -191,7 +191,10 @@ class RollbackSession {
     final checksumNeeded = _nextChecksumFrame;
     _snapshots.removeWhere((f, _) => f < keepFrom && f < checksumNeeded);
     _usedRemote.removeWhere((f, _) => f < keepFrom);
-    _remote.removeWhere((f, _) => f < _confirmedRemote - 1);
+    // Remote inputs can arrive far ahead of our own frame (the other side
+    // runs faster). Keep them until we have simulated past them; only the
+    // last confirmed one is also needed for predictions.
+    _remote.removeWhere((f, _) => f < keepFrom && f < _confirmedRemote);
     _remoteChecksums.removeWhere(
       (f, _) => confirmedChecksums.containsKey(f) && f < keepFrom,
     );

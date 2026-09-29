@@ -31,6 +31,7 @@ class LobbyHandshake {
   String? error;
 
   int _ticks = 0;
+  bool _toldPeer = false;
 
   bool get done => start != null || error != null;
 
@@ -44,8 +45,10 @@ class LobbyHandshake {
       }
       switch (p) {
         case HelloPacket():
-          if (p.version != Packet.protocolVersion) {
-            error = 'The other player has a different game version';
+          if (p.version != Packet.protocolVersion || p.rules != hello.rules) {
+            error =
+                'The other player has a different version of the game. '
+                'Update both to the same build.';
           }
           remoteHello = p;
         case StartPacket() when !isHost:
@@ -54,7 +57,13 @@ class LobbyHandshake {
           break; // game packets can arrive early; the match handles them
       }
     }
-    if (error != null) return;
+    if (error != null) {
+      // Send our hello once more so the other side sees the mismatch too
+      // instead of waiting for a start that never comes.
+      if (!_toldPeer) transport.send(hello.encode());
+      _toldPeer = true;
+      return;
+    }
     final agreed = start;
     if (agreed != null) {
       // Host: keep offering the start until the match takes over (and

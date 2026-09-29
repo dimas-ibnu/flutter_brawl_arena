@@ -117,8 +117,13 @@ class HelloPacket extends _JsonPacket {
   const HelloPacket({
     required this.fighterId,
     required this.skinId,
+    this.rules = 0,
     this.version = Packet.protocolVersion,
   });
+
+  /// Fingerprint of the game rules and fighter data (see
+  /// rules_fingerprint.dart). Must match, or the match would desync.
+  final int rules;
 
   static const int type = 3;
 
@@ -134,6 +139,7 @@ class HelloPacket extends _JsonPacket {
     'version': version,
     'fighter': fighterId,
     'skin': skinId,
+    'rules': rules,
   };
 
   static HelloPacket _decode(Uint8List bytes) {
@@ -142,6 +148,7 @@ class HelloPacket extends _JsonPacket {
       version: j['version'] as int,
       fighterId: j['fighter'] as String,
       skinId: j['skin'] as String,
+      rules: j['rules'] as int? ?? 0,
     );
   }
 }
