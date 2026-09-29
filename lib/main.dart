@@ -2,7 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'ui/game_screen.dart';
+import 'game/sounds.dart';
+import 'ui/app.dart';
 
 /// Force the on-screen controls on desktop (mouse = one finger):
 /// `flutter run -d macos --dart-define=TOUCH_CONTROLS=true`
@@ -20,10 +21,19 @@ Future<void> main() async {
       defaultTargetPlatform == TargetPlatform.android ||
       defaultTargetPlatform == TargetPlatform.iOS;
 
+  final sounds = FlameSounds();
+  final roster = await BrawlApp.loadRoster();
+  try {
+    await sounds.load();
+  } catch (e) {
+    debugPrint('Sound failed to load, playing silent: $e');
+  }
+
   runApp(
-    MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: GameScreen(showTouchControls: isPhone || _forceTouchControls),
+    BrawlApp(
+      roster: roster,
+      sounds: sounds,
+      showTouchControls: isPhone || _forceTouchControls,
     ),
   );
 }

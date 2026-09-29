@@ -257,6 +257,33 @@ void main() {
     });
   });
 
+  group('hit-freeze', () {
+    test('weak hits do not freeze the match', () {
+      final (sim, state) = _faceOff();
+      sim.step(state, [_light, InputFrame.none]);
+      _run(sim, state, knightDef.move(MoveKind.neutralLight).startup);
+      expect(state.fighters[1].damage, greaterThan(0));
+      expect(state.hitFreeze, 0);
+    });
+
+    test('strong hits freeze everything briefly, clock included', () {
+      final (sim, state) = _faceOff();
+      state.fighters[1].damage = 150;
+      sim.step(state, [_light, InputFrame.none]);
+      _run(sim, state, knightDef.move(MoveKind.neutralLight).startup);
+      final freeze = state.hitFreeze;
+      expect(freeze, inInclusiveRange(1, MatchSimulation.maxHitFreeze));
+
+      final frame = state.frame;
+      final x = state.fighters[1].x;
+      _run(sim, state, freeze);
+      expect(state.frame, frame, reason: 'clock stopped');
+      expect(state.fighters[1].x, x, reason: 'nobody moved');
+      sim.step(state, _idle);
+      expect(state.frame, frame + 1);
+    });
+  });
+
   test('boxes overlap only when they share area', () {
     const a = Box(Fx.zero, Fx.zero, Fx.fromInt(10), Fx.fromInt(10));
     const touching = Box(

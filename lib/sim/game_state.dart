@@ -129,6 +129,7 @@ class GameState {
     required this.frame,
     required this.finished,
     required this.winner,
+    required this.hitFreeze,
   });
 
   final List<FighterState> fighters;
@@ -143,6 +144,10 @@ class GameState {
   /// Slot of the winner, or -1 for a draw (only meaningful when [finished]).
   int winner = -1;
 
+  /// Ticks left of the short pause after a strong hit (hit-freeze). The whole
+  /// match stands still, the clock included, to make big hits feel heavy.
+  int hitFreeze = 0;
+
   /// Xorshift32 state. Kept inside the game state so restoring a saved state
   /// also restores the random sequence.
   int rngState;
@@ -153,6 +158,7 @@ class GameState {
     frame: frame,
     finished: finished,
     winner: winner,
+    hitFreeze: hitFreeze,
   );
 
   /// A value in `[0, maxExclusive)` from the seeded generator.
@@ -172,7 +178,8 @@ class GameState {
       ..add(frame)
       ..add(rngState)
       ..add(finished ? 1 : 0)
-      ..add(winner);
+      ..add(winner)
+      ..add(hitFreeze);
     for (final f in fighters) {
       f._hashInto(hash);
     }

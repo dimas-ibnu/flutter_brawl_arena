@@ -1,6 +1,8 @@
 {
   "knight": {
     "name": "Knight",
+    "weapon": "Sword",
+    "style": "Big hits, hard to launch",
     "width": 48,
     "height": 96,
     "weight": 115,
@@ -88,6 +90,8 @@
   },
   "ranger": {
     "name": "Ranger",
+    "weapon": "Spear",
+    "style": "Fast combos, strong recovery",
     "width": 40,
     "height": 88,
     "weight": 90,

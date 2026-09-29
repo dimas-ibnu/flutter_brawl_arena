@@ -7,6 +7,7 @@ import 'package:brawl_arena/sim/fixed.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/fighters.dart';
+import '../helpers/roster.dart';
 
 void main() {
   test('both MVP fighters load with every move', () {
@@ -62,5 +63,13 @@ void main() {
         ),
       ),
     );
+  });
+
+  test('the roster lists fighters in file order with display text', () {
+    expect([for (final e in testRoster) e.id], ['knight', 'ranger']);
+    expect(rosterEntry('knight').weapon, 'Sword');
+    expect(rosterEntry('ranger').weapon, 'Spear');
+    expect(rosterEntry('ranger').style, isNotEmpty);
+    expect(rosterEntry('knight').def.name, 'Knight');
   });
 }

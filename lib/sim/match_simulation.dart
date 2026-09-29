@@ -52,11 +52,20 @@ class MatchSimulation {
   /// Hitstun ticks per unit of knockback speed.
   static const Fx hitstunPerKnockback = Fx.ratio(8, 5);
 
+  /// Hits launching at least this fast freeze the match briefly; the freeze
+  /// lasts knockback / 3 ticks, capped at [maxHitFreeze].
+  static const Fx hitFreezeMinKnockback = Fx.fromInt(12);
+  static const int maxHitFreeze = 10;
+
   /// Advances [state] by one tick. [inputs] holds one frame per fighter.
   /// Does nothing once the match is finished.
   void step(GameState state, List<InputFrame> inputs) {
     assert(inputs.length == state.fighters.length);
     if (state.finished) return;
+    if (state.hitFreeze > 0) {
+      state.hitFreeze--;
+      return;
+    }
     for (var i = 0; i < state.fighters.length; i++) {
       final f = state.fighters[i];
       if (!f.eliminated) _stepFighter(f, fighterDefs[i], inputs[i], i);
@@ -312,6 +321,10 @@ class MatchSimulation {
       target.vx = (attack.launchX * speed).mulInt(side);
       target.vy = attack.launchY * speed;
       target.hitstun = (speed * hitstunPerKnockback).floorToInt();
+      if (speed >= hitFreezeMinKnockback) {
+        final freeze = speed.divInt(3).floorToInt();
+        state.hitFreeze = freeze > maxHitFreeze ? maxHitFreeze : freeze;
+      }
       target.attackFrame = 0;
       target.grounded = false;
       // Getting hit gives the air dodge and recovery back.

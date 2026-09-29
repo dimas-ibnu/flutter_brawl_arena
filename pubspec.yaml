@@ -8,6 +8,7 @@ environment:
 
 dependencies:
   flame: ^1.38.2
+  flame_audio: ^2.12.2
   flutter:
     sdk: flutter
 
@@ -21,3 +22,4 @@ flutter:
 
   assets:
     - assets/data/
+    - assets/audio/
