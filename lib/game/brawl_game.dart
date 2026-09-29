@@ -1,3 +1,4 @@
+import 'package:flame/components.dart';
 import 'package:flame/game.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
@@ -14,12 +15,9 @@ import 'fixed_step_clock.dart';
 /// Debug view: runs the simulation at a fixed 60 ticks per second and draws
 /// the state as plain rectangles. It only reads the state, never writes it.
 class BrawlGame extends FlameGame with KeyboardEvents {
-  BrawlGame({int seed = 1})
+  BrawlGame({required List<FighterDef> fighters, int seed = 1})
     : _seed = seed,
-      _sim = MatchSimulation(
-        stage: StageDef.flatArena,
-        fighterDefs: const [FighterDef.knight, FighterDef.ranger],
-      ) {
+      _sim = MatchSimulation(stage: StageDef.flatArena, fighterDefs: fighters) {
     _state = _sim.initialState(seed: seed);
   }
 
@@ -32,6 +30,19 @@ class BrawlGame extends FlameGame with KeyboardEvents {
 
   /// Written by the on-screen controls, read once per tick.
   final TouchInput touchInput = TouchInput();
+
+  /// Null while the match runs; then the winner's slot, or -1 for a draw.
+  final ValueNotifier<int?> result = ValueNotifier(null);
+
+  /// Names for the result screen, by slot.
+  List<String> get fighterNames => [for (final d in _sim.fighterDefs) d.name];
+
+  /// Starts a fresh match with the same fighters.
+  void restart() {
+    _state = _sim.initialState(seed: _seed);
+    touchInput.reset();
+    result.value = null;
+  }
 
   /// Width of the world shown on screen, in world units.
   static const double _viewWidth = 1600;
@@ -48,8 +59,16 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     ..style = PaintingStyle.stroke
     ..strokeWidth = 3;
   static final _hitboxPaint = Paint()..color = const Color(0xAAFF1744);
+  static final _dodgePaint = Paint()..color = const Color(0x55FFFFFF);
   static final _hud = TextPaint(
     style: const TextStyle(color: Colors.white70, fontSize: 14),
+  );
+  static final _clockText = TextPaint(
+    style: const TextStyle(
+      color: Colors.white,
+      fontSize: 22,
+      fontWeight: FontWeight.w600,
+    ),
   );
 
   @override
@@ -65,6 +84,7 @@ class BrawlGame extends FlameGame with KeyboardEvents {
       // Slot 1 is the training dummy: it stands still until the bot exists.
       _sim.step(_state, [player, InputFrame.none]);
     }
+    if (_state.finished && result.value == null) result.value = _state.winner;
   }
 
   @override
@@ -96,30 +116,46 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     final ranger = _state.fighters[1];
     _hud.render(
       canvas,
-      'You (Knight) ${knight.damage}%  stocks ${knight.stocks}      '
-      'Dummy (Ranger) ${ranger.damage}%  stocks ${ranger.stocks}',
+      'You (Knight) ${knight.damage}%  ${_stockDots(knight)}      '
+      'Dummy (Ranger) ${ranger.damage}%  ${_stockDots(ranger)}',
       Vector2(16, 16),
+    );
+    final secondsLeft = (_sim.ticksLeft(_state) + 59) ~/ 60;
+    _clockText.render(
+      canvas,
+      '${secondsLeft ~/ 60}:${(secondsLeft % 60).toString().padLeft(2, '0')}',
+      Vector2(size.x / 2, 12),
+      anchor: Anchor.topCenter,
     );
     _hud.render(
       canvas,
-      'Keys: A / D move   Space or W jump (x3)   S fast fall   J light attack'
-      '   R reset      frame ${_state.frame}  '
+      'A/D move  Space/W jump  S fast fall  J light  K heavy  L dodge  '
+      '(hold a direction to change the move)  R reset   frame ${_state.frame}  '
       'checksum ${_state.checksum().toRadixString(16)}',
       Vector2(16, 38),
     );
   }
 
+  String _stockDots(FighterState f) =>
+      '${'●' * f.stocks}${'○' * (_sim.startingStocks - f.stocks)}';
+
   void _renderFighter(Canvas canvas, FighterState f, FighterDef def, int slot) {
+    if (f.eliminated) return;
+    // Blink while respawn-invincible.
+    if (f.invincible > 0 && (f.invincible ~/ 4).isOdd) return;
     final x = f.x.toDouble();
     final y = f.y.toDouble();
     final w = def.width.toDouble();
     final h = def.height.toDouble();
 
     // Flash white every few ticks while in hitstun.
+    // See-through while dodging (invincible).
     final flashing = f.hitstun > 0 && (f.hitstun ~/ 3).isEven;
     canvas.drawRect(
       Rect.fromLTWH(x - w / 2, y - h, w, h),
-      flashing ? _hitFlashPaint : _fighterPaints[slot],
+      f.dodgeFrame > 0
+          ? _dodgePaint
+          : (flashing ? _hitFlashPaint : _fighterPaints[slot]),
     );
     // Eye on the facing side.
     canvas.drawRect(
@@ -131,9 +167,9 @@ class BrawlGame extends FlameGame with KeyboardEvents {
       _facingPaint,
     );
 
-    if (f.attackFrame > 0) {
-      final attack = def.lightAttack;
-      final box = MatchSimulation.hitboxOf(f, attack);
+    final attack = _sim.currentMove(slot, f);
+    final box = _sim.currentHitbox(slot, f);
+    if (attack != null && box != null) {
       final rect = Rect.fromLTRB(
         box.left.toDouble(),
         box.top.toDouble(),
@@ -155,7 +191,7 @@ class BrawlGame extends FlameGame with KeyboardEvents {
   ) {
     _keyboardInput = inputFromKeys(keysPressed);
     if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.keyR) {
-      _state = _sim.initialState(seed: _seed);
+      restart();
     }
     return KeyEventResult.handled;
   }

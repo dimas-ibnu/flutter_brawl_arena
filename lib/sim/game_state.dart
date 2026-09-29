@@ -14,8 +14,14 @@ class FighterState {
     this.grounded = false,
     this.airJumpsLeft = 0,
     this.attackFrame = 0,
+    this.attackMove = 0,
     this.attackHit = false,
     this.hitstun = 0,
+    this.dodgeFrame = 0,
+    this.dodgeCooldown = 0,
+    this.airDodgeUsed = false,
+    this.recoveryUsed = false,
+    this.invincible = 0,
     this.damage = 0,
     required this.stocks,
     this.lastInput = InputFrame.none,
@@ -35,11 +41,32 @@ class FighterState {
   /// Ticks into the current attack, counting from 1; 0 = not attacking.
   int attackFrame;
 
+  /// Index into MoveKind of the current attack (valid while attacking).
+  int attackMove;
+
   /// True once the current attack has connected, so it hits only once.
   bool attackHit;
 
   /// Ticks left where this fighter can't act after being hit.
   int hitstun;
+
+  /// Ticks into the current dodge, counting from 1; 0 = not dodging.
+  /// Dodging fighters can't be hit.
+  int dodgeFrame;
+
+  /// Ticks before the next dodge is allowed.
+  int dodgeCooldown;
+
+  /// Air dodge and recovery work once per trip into the air. Landing or
+  /// getting hit gives them back.
+  bool airDodgeUsed;
+  bool recoveryUsed;
+
+  /// Ticks of respawn invincibility left. Can't be hit while above 0.
+  int invincible;
+
+  /// Out of stocks: no longer in the match.
+  bool get eliminated => stocks <= 0;
 
   /// Damage percent. Higher damage means bigger knockback.
   int damage;
@@ -57,8 +84,14 @@ class FighterState {
     grounded: grounded,
     airJumpsLeft: airJumpsLeft,
     attackFrame: attackFrame,
+    attackMove: attackMove,
     attackHit: attackHit,
     hitstun: hitstun,
+    dodgeFrame: dodgeFrame,
+    dodgeCooldown: dodgeCooldown,
+    airDodgeUsed: airDodgeUsed,
+    recoveryUsed: recoveryUsed,
+    invincible: invincible,
     damage: damage,
     stocks: stocks,
     lastInput: lastInput,
@@ -73,8 +106,14 @@ class FighterState {
     ..add(grounded ? 1 : 0)
     ..add(airJumpsLeft)
     ..add(attackFrame)
+    ..add(attackMove)
     ..add(attackHit ? 1 : 0)
     ..add(hitstun)
+    ..add(dodgeFrame)
+    ..add(dodgeCooldown)
+    ..add(airDodgeUsed ? 1 : 0)
+    ..add(recoveryUsed ? 1 : 0)
+    ..add(invincible)
     ..add(damage)
     ..add(stocks)
     ..add(lastInput.bits);
@@ -88,12 +127,21 @@ class GameState {
     required this.fighters,
     required this.rngState,
     required this.frame,
+    required this.finished,
+    required this.winner,
   });
 
   final List<FighterState> fighters;
 
   /// Ticks since the match started (60 per second).
   int frame;
+
+  /// True once someone is out of stocks or time runs out. The state stops
+  /// changing after that.
+  bool finished = false;
+
+  /// Slot of the winner, or -1 for a draw (only meaningful when [finished]).
+  int winner = -1;
 
   /// Xorshift32 state. Kept inside the game state so restoring a saved state
   /// also restores the random sequence.
@@ -103,6 +151,8 @@ class GameState {
     fighters: [for (final f in fighters) f.copy()],
     rngState: rngState,
     frame: frame,
+    finished: finished,
+    winner: winner,
   );
 
   /// A value in `[0, maxExclusive)` from the seeded generator.
@@ -120,7 +170,9 @@ class GameState {
   int checksum() {
     final hash = _Fnv()
       ..add(frame)
-      ..add(rngState);
+      ..add(rngState)
+      ..add(finished ? 1 : 0)
+      ..add(winner);
     for (final f in fighters) {
       f._hashInto(hash);
     }

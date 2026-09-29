@@ -5,6 +5,8 @@ import 'package:brawl_arena/sim/input_frame.dart';
 import 'package:brawl_arena/sim/match_simulation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../helpers/fighters.dart';
+
 const _idle = [InputFrame.none, InputFrame.none];
 final _light = InputFrame.of([Button.light]);
 final _jab = AttackDef(
@@ -27,7 +29,7 @@ final _jab = AttackDef(
 (MatchSimulation, GameState) _faceOff({int rangerX = 60}) {
   final sim = MatchSimulation(
     stage: StageDef.flatArena,
-    fighterDefs: const [FighterDef.knight, FighterDef.ranger],
+    fighterDefs: [knightDef, rangerDef],
   );
   final state = sim.initialState(seed: 1);
   for (var i = 0; i < 120; i++) {
@@ -61,15 +63,18 @@ void main() {
       sim.step(state, [_light, InputFrame.none]);
       expect(knight.attackFrame, 1);
 
-      _run(sim, state, FighterDef.knight.lightAttack.totalFrames - 1);
-      expect(knight.attackFrame, FighterDef.knight.lightAttack.totalFrames);
+      _run(sim, state, knightDef.move(MoveKind.neutralLight).totalFrames - 1);
+      expect(
+        knight.attackFrame,
+        knightDef.move(MoveKind.neutralLight).totalFrames,
+      );
       sim.step(state, _idle);
       expect(knight.attackFrame, 0);
     });
 
     test('holding light does not restart the attack', () {
       final (sim, state) = _faceOff(rangerX: 400);
-      final total = FighterDef.knight.lightAttack.totalFrames;
+      final total = knightDef.move(MoveKind.neutralLight).totalFrames;
       _run(sim, state, total + 5, [_light, InputFrame.none]);
       expect(state.fighters[0].attackFrame, 0);
     });
@@ -98,7 +103,7 @@ void main() {
     test('a jab in range damages, launches and stuns the target', () {
       final (sim, state) = _faceOff();
       final ranger = state.fighters[1];
-      final attack = FighterDef.knight.lightAttack;
+      final attack = knightDef.move(MoveKind.neutralLight);
       sim.step(state, [_light, InputFrame.none]);
       _run(sim, state, attack.startup);
 
@@ -111,14 +116,17 @@ void main() {
     test('a jab hits only once per swing', () {
       final (sim, state) = _faceOff();
       sim.step(state, [_light, InputFrame.none]);
-      _run(sim, state, FighterDef.knight.lightAttack.totalFrames);
-      expect(state.fighters[1].damage, FighterDef.knight.lightAttack.damage);
+      _run(sim, state, knightDef.move(MoveKind.neutralLight).totalFrames);
+      expect(
+        state.fighters[1].damage,
+        knightDef.move(MoveKind.neutralLight).damage,
+      );
     });
 
     test('out of range misses', () {
       final (sim, state) = _faceOff(rangerX: 200);
       sim.step(state, [_light, InputFrame.none]);
-      _run(sim, state, FighterDef.knight.lightAttack.totalFrames);
+      _run(sim, state, knightDef.move(MoveKind.neutralLight).totalFrames);
       expect(state.fighters[1].damage, 0);
     });
 
@@ -126,15 +134,15 @@ void main() {
       final (sim, state) = _faceOff(rangerX: -60);
       state.fighters[0].facing = -1;
       sim.step(state, [_light, InputFrame.none]);
-      _run(sim, state, FighterDef.knight.lightAttack.startup);
+      _run(sim, state, knightDef.move(MoveKind.neutralLight).startup);
       expect(state.fighters[1].vx.isNegative, isTrue);
     });
 
     test('attacks on the same tick trade', () {
       final (sim, state) = _faceOff();
       // Ranger's jab is faster; delay its press so both go active together.
-      final knightStartup = FighterDef.knight.lightAttack.startup;
-      final rangerStartup = FighterDef.ranger.lightAttack.startup;
+      final knightStartup = knightDef.move(MoveKind.neutralLight).startup;
+      final rangerStartup = rangerDef.move(MoveKind.neutralLight).startup;
       sim.step(state, [_light, InputFrame.none]);
       _run(sim, state, knightStartup - rangerStartup - 1, [
         _light,
@@ -143,8 +151,14 @@ void main() {
       sim.step(state, [_light, _light]);
       _run(sim, state, rangerStartup, [_light, _light]);
 
-      expect(state.fighters[0].damage, FighterDef.ranger.lightAttack.damage);
-      expect(state.fighters[1].damage, FighterDef.knight.lightAttack.damage);
+      expect(
+        state.fighters[0].damage,
+        rangerDef.move(MoveKind.neutralLight).damage,
+      );
+      expect(
+        state.fighters[1].damage,
+        knightDef.move(MoveKind.neutralLight).damage,
+      );
     });
 
     test('getting hit cancels your attack', () {
@@ -176,6 +190,21 @@ void main() {
       expect(heavy < light, isTrue);
     });
 
+    test('is the same wherever the hitbox touches (no sweet spot)', () {
+      double travel(int rangerX) {
+        final (sim, state) = _faceOff(rangerX: rangerX);
+        final startX = state.fighters[1].x;
+        sim.step(state, [_light, InputFrame.none]);
+        _run(sim, state, 60);
+        expect(state.fighters[1].damage, greaterThan(0));
+        return (state.fighters[1].x - startX).toDouble();
+      }
+
+      final close = travel(30);
+      expect(travel(60), close);
+      expect(travel(99), close, reason: 'tip of the hitbox');
+    });
+
     test('a target at high damage flies farther', () {
       double distanceAfterHit(int startDamage) {
         final (sim, state) = _faceOff();
@@ -195,7 +224,7 @@ void main() {
       final (sim, state) = _faceOff();
       final ranger = state.fighters[1];
       sim.step(state, [_light, InputFrame.none]);
-      _run(sim, state, FighterDef.knight.lightAttack.startup);
+      _run(sim, state, knightDef.move(MoveKind.neutralLight).startup);
       final stun = ranger.hitstun;
       expect(stun, greaterThan(1));
 
@@ -216,7 +245,7 @@ void main() {
       final (sim, state) = _faceOff();
       final ranger = state.fighters[1];
       sim.step(state, [_light, InputFrame.none]);
-      _run(sim, state, FighterDef.knight.lightAttack.startup);
+      _run(sim, state, knightDef.move(MoveKind.neutralLight).startup);
       final jumpsBefore = ranger.airJumpsLeft;
       sim.step(state, [
         InputFrame.none,
