@@ -6,6 +6,7 @@ import '../data/roster.dart';
 import '../game/stage_art.dart';
 import '../game/brawl_game.dart';
 import '../game/sounds.dart';
+import '../net/net_match.dart';
 import 'theme.dart';
 import 'touch_controls.dart';
 
@@ -22,7 +23,13 @@ class GameScreen extends StatefulWidget {
     this.playerSkin,
     this.opponentSkin,
     this.palette = sunsetPalette,
+    this.localSlot = 0,
+    this.online,
   });
+
+  /// Online matches: which slot this device plays, and the connection.
+  final int localSlot;
+  final NetMatch? online;
 
   final Skin? playerSkin;
   final Skin? opponentSkin;
@@ -48,7 +55,17 @@ class _GameScreenState extends State<GameScreen> {
     palette: widget.palette,
     sounds: widget.sounds,
     showKeyboardHints: !widget.showTouchControls,
+    localSlot: widget.localSlot,
+    online: widget.online,
   );
+
+  bool get _online => widget.online != null;
+
+  @override
+  void dispose() {
+    _game.leaveOnline();
+    super.dispose();
+  }
 
   void _click(VoidCallback then) {
     widget.sounds.play(Sfx.uiClick);
@@ -85,8 +102,12 @@ class _GameScreenState extends State<GameScreen> {
                 ? PauseOverlay(
                     muted: widget.sounds.muted,
                     onResume: () => _click(() => _game.setPaused(false)),
-                    onRestart: () => _click(_game.restart),
+                    // Online matches can't restart; Quit leaves the match.
+                    onRestart: _online ? null : () => _click(_game.restart),
                     onQuit: () => _click(_leave),
+                    note: _online
+                        ? 'Online matches keep running while this is open.'
+                        : null,
                   )
                 : const SizedBox.shrink(),
           ),
@@ -96,9 +117,19 @@ class _GameScreenState extends State<GameScreen> {
                 ? const SizedBox.shrink()
                 : MatchResultOverlay(
                     winner: winner,
-                    names: [widget.player.name, widget.opponent.name],
-                    onRematch: () => _click(_game.restart),
+                    localSlot: widget.localSlot,
+                    names: [for (final e in _game.entries) e.name],
+                    onRematch: _online ? null : () => _click(_game.restart),
                     onChangeFighter: () => _click(_leave),
+                  ),
+          ),
+          ValueListenableBuilder<String?>(
+            valueListenable: _game.connectionProblem,
+            builder: (context, problem, _) => problem == null
+                ? const SizedBox.shrink()
+                : ConnectionProblemOverlay(
+                    message: problem,
+                    onLeave: () => _click(_leave),
                   ),
           ),
         ],
@@ -137,12 +168,16 @@ class PauseOverlay extends StatelessWidget {
     required this.onResume,
     required this.onRestart,
     required this.onQuit,
+    this.note,
   });
 
   final ValueNotifier<bool> muted;
   final VoidCallback onResume;
-  final VoidCallback onRestart;
+
+  /// Null hides Restart (online).
+  final VoidCallback? onRestart;
   final VoidCallback onQuit;
+  final String? note;
 
   @override
   Widget build(BuildContext context) => _Panel(
@@ -151,6 +186,10 @@ class PauseOverlay extends StatelessWidget {
         'Paused',
         style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800),
       ),
+      if (note != null) ...[
+        const SizedBox(height: 4),
+        Text(note!, style: const TextStyle(color: BrawlColors.muted)),
+      ],
       const SizedBox(height: 16),
       FilledButton(
         key: const Key('resume'),
@@ -161,12 +200,14 @@ class PauseOverlay extends StatelessWidget {
       Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          OutlinedButton(
-            key: const Key('restart'),
-            onPressed: onRestart,
-            child: const Text('Restart'),
-          ),
-          const SizedBox(width: 8),
+          if (onRestart != null) ...[
+            OutlinedButton(
+              key: const Key('restart'),
+              onPressed: onRestart,
+              child: const Text('Restart'),
+            ),
+            const SizedBox(width: 8),
+          ],
           OutlinedButton(
             key: const Key('quit'),
             onPressed: onQuit,
@@ -197,17 +238,26 @@ class MatchResultOverlay extends StatelessWidget {
     required this.names,
     required this.onRematch,
     required this.onChangeFighter,
+    this.localSlot = 0,
   });
 
   /// Winner's slot, or -1 for a draw.
   final int winner;
+
+  /// The slot this device plays (0 against the bot; 0 or 1 online).
+  final int localSlot;
+
+  /// Fighter names by slot.
   final List<String> names;
-  final VoidCallback onRematch;
+
+  /// Null hides Rematch (online).
+  final VoidCallback? onRematch;
   final VoidCallback onChangeFighter;
 
   @override
   Widget build(BuildContext context) {
-    final title = winner < 0 ? 'Draw' : (winner == 0 ? 'You win!' : 'You lose');
+    final won = winner == localSlot;
+    final title = winner < 0 ? 'Draw' : (won ? 'You win!' : 'You lose');
     final subtitle = winner < 0
         ? 'Same stocks and damage'
         : '${names[winner]} wins the match';
@@ -218,7 +268,7 @@ class MatchResultOverlay extends StatelessWidget {
           style: TextStyle(
             fontSize: 40,
             fontWeight: FontWeight.w900,
-            color: winner == 0 ? BrawlColors.accent : Colors.white,
+            color: won ? BrawlColors.accent : Colors.white,
           ),
         ),
         const SizedBox(height: 4),
@@ -227,20 +277,53 @@ class MatchResultOverlay extends StatelessWidget {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            FilledButton(
-              key: const Key('rematch'),
-              onPressed: onRematch,
-              child: const Text('Rematch'),
-            ),
-            const SizedBox(width: 12),
+            if (onRematch != null) ...[
+              FilledButton(
+                key: const Key('rematch'),
+                onPressed: onRematch,
+                child: const Text('Rematch'),
+              ),
+              const SizedBox(width: 12),
+            ],
             OutlinedButton(
               key: const Key('change-fighter'),
               onPressed: onChangeFighter,
-              child: const Text('Change fighter'),
+              child: Text(onRematch == null ? 'Leave' : 'Change fighter'),
             ),
           ],
         ),
       ],
     );
   }
+}
+
+/// Online only: the match can't go on (opponent left, connection lost,
+/// out of sync).
+class ConnectionProblemOverlay extends StatelessWidget {
+  const ConnectionProblemOverlay({
+    super.key,
+    required this.message,
+    required this.onLeave,
+  });
+
+  final String message;
+  final VoidCallback onLeave;
+
+  @override
+  Widget build(BuildContext context) => _Panel(
+    children: [
+      const Icon(Icons.wifi_off, size: 40),
+      const SizedBox(height: 8),
+      Text(
+        message,
+        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
+      ),
+      const SizedBox(height: 16),
+      FilledButton(
+        key: const Key('leave'),
+        onPressed: onLeave,
+        child: const Text('Leave'),
+      ),
+    ],
+  );
 }

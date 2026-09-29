@@ -8,9 +8,11 @@ import '../data/cosmetics_store.dart';
 import '../data/fighter_data.dart';
 import '../data/roster.dart';
 import '../game/sounds.dart';
+import '../net/online_service.dart';
 import 'fighter_select_screen.dart';
 import 'game_screen.dart';
 import 'locker_screen.dart';
+import 'online_lobby_screen.dart';
 import 'theme.dart';
 import 'title_screen.dart';
 
@@ -24,7 +26,11 @@ class BrawlApp extends StatelessWidget {
     required this.cosmetics,
     required this.sounds,
     required this.showTouchControls,
+    this.online,
   });
+
+  /// Null when Firebase isn't configured: Play Online explains the setup.
+  final OnlineService? online;
 
   final List<RosterEntry> roster;
   final CosmeticsStore cosmetics;
@@ -58,6 +64,44 @@ class BrawlApp extends StatelessWidget {
               context,
             ).push(MaterialPageRoute<void>(builder: (_) => _select()));
           },
+          onOnline: () {
+            _click();
+            final service = online;
+            if (service == null) {
+              showDialog<void>(
+                context: context,
+                builder: (_) => const AlertDialog(
+                  title: Text('Online play is not set up'),
+                  content: Text(
+                    'This build has no Firebase settings. Run it with '
+                    '--dart-define-from-file=firebase.env.json '
+                    '(see README_ONLINE.md).',
+                  ),
+                ),
+              );
+              return;
+            }
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => _select(
+                  onPicked: (context, player) {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => OnlineLobbyScreen(
+                          service: service,
+                          player: player,
+                          roster: roster,
+                          cosmetics: cosmetics,
+                          sounds: sounds,
+                          showTouchControls: showTouchControls,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
+          },
           onLocker: () {
             _click();
             Navigator.of(context).push(
@@ -75,15 +119,25 @@ class BrawlApp extends StatelessWidget {
     );
   }
 
-  Widget _select() => Builder(
+  /// Fighter select. [onPicked] replaces the default (a match vs the bot).
+  Widget _select({
+    void Function(BuildContext context, RosterEntry player)? onPicked,
+  }) => Builder(
     builder: (context) => ListenableBuilder(
       listenable: cosmetics,
       builder: (context, _) => FighterSelectScreen(
         roster: roster,
         onTap: _click,
         skinFor: cosmetics.equippedSkin,
+        opponentLabel: onPicked == null
+            ? 'Opponent: random bot (Normal)'
+            : 'Opponent: another player online',
         onFight: (player) {
           _click();
+          if (onPicked != null) {
+            onPicked(context, player);
+            return;
+          }
           final rng = math.Random();
           final opponent = roster[rng.nextInt(roster.length)];
           final playerSkin = cosmetics.equippedSkin(player.id);

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flame/components.dart';
@@ -12,7 +11,9 @@ import '../data/cosmetics.dart';
 import '../data/roster.dart';
 import '../input/keyboard_input.dart';
 import '../input/touch_input.dart';
+import '../net/net_match.dart';
 import '../replay/replay.dart';
+import '../replay/replay_file.dart';
 import '../sim/defs.dart';
 import '../sim/game_state.dart';
 import '../sim/input_frame.dart';
@@ -22,8 +23,8 @@ import 'fixed_step_clock.dart';
 import 'sounds.dart';
 import 'stage_art.dart';
 
-/// A player-vs-bot match. Runs the simulation at a fixed 60 ticks per second
-/// and draws it. Everything here only reads the simulation state; effects
+/// A match against the bot, or online against another player ([online]).
+/// Runs the simulation at a fixed 60 ticks per second and draws it. Everything here only reads the simulation state; effects
 /// like sparks, shake and sound are worked out by comparing ticks.
 class BrawlGame extends FlameGame with KeyboardEvents {
   BrawlGame({
@@ -35,18 +36,43 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     StagePalette palette = sunsetPalette,
     GameSounds? sounds,
     this.showKeyboardHints = true,
+    this.localSlot = 0,
+    this.online,
   }) : sounds = sounds ?? SilentSounds(),
-       sim = MatchSimulation(
-         stage: StageDef.flatArena,
-         fighterDefs: [player.def, opponent.def],
-       ),
+       sim =
+           online?.session.sim ??
+           MatchSimulation(
+             stage: StageDef.flatArena,
+             fighterDefs: localSlot == 0
+                 ? [player.def, opponent.def]
+                 : [opponent.def, player.def],
+           ),
        _backdrop = StageBackdrop(palette) {
-    _bot = Bot(sim: sim, slot: 1, seed: seed);
+    assert(online == null || online!.session.localSlot == localSlot);
+    _bot = Bot(sim: sim, slot: 1 - localSlot, seed: seed);
     _newMatch();
   }
 
+  /// This device's player and the other side (the bot, or the online
+  /// opponent).
   final RosterEntry player;
   final RosterEntry opponent;
+
+  /// Which simulation slot this device controls. Online, the host is 0 and
+  /// the guest 1; against the bot it is always 0.
+  final int localSlot;
+
+  /// Set for online matches: the rollback session drives the simulation.
+  final NetMatch? online;
+  bool get isOnline => online != null;
+
+  /// Fighters by simulation slot.
+  List<RosterEntry> get entries =>
+      localSlot == 0 ? [player, opponent] : [opponent, player];
+
+  /// Why an online match can't go on ('Opponent left', 'Connection lost',
+  /// 'Out of sync'), or null.
+  final ValueNotifier<String?> connectionProblem = ValueNotifier(null);
   final int seed;
 
   /// Cosmetics: visual only, never passed to the simulation.
@@ -93,9 +119,12 @@ class BrawlGame extends FlameGame with KeyboardEvents {
   /// Recent weapon-tip positions per fighter, for skin weapon trails.
   final _trails = [<Offset>[], <Offset>[]];
 
-  Skin? _skinOf(int slot) => slot == 0 ? playerSkin : opponentSkin;
+  Skin? _skinOf(int slot) => slot == localSlot ? playerSkin : opponentSkin;
 
-  static const _slotColors = [Color(0xFF4FC3F7), Color(0xFFFF8A65)];
+  /// Blue for this device's player, orange for the other side.
+  static const _youColor = Color(0xFF4FC3F7);
+  static const _themColor = Color(0xFFFF8A65);
+  Color _colorOf(int slot) => slot == localSlot ? _youColor : _themColor;
 
   /// Width of the world shown on screen, in world units. The camera zooms
   /// between these to keep both fighters in view.
@@ -107,7 +136,7 @@ class BrawlGame extends FlameGame with KeyboardEvents {
   double _camY = -150;
 
   void _newMatch() {
-    _state = sim.initialState(seed: seed);
+    _state = online?.state ?? sim.initialState(seed: seed);
     _bot.reset();
     touchInput.reset();
     _sparks.clear();
@@ -117,14 +146,15 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     _shake = 0;
     _replay = Replay(
       seed: seed,
-      fighterIds: [player.id, opponent.id],
+      fighterIds: [for (final e in entries) e.id],
       stage: 'flatArena',
     );
     _before = [for (final f in _state.fighters) _Seen(f)];
   }
 
-  /// Starts a fresh match with the same fighters.
+  /// Starts a fresh match with the same fighters (not online).
   void restart() {
+    if (isOnline) return;
     _newMatch();
     pauseMenuOpen.value = false;
     result.value = null;
@@ -156,22 +186,53 @@ class BrawlGame extends FlameGame with KeyboardEvents {
   void update(double dt) {
     super.update(dt);
     _updateEffects(dt);
-    if (pauseMenuOpen.value) return;
-    final ticks = _clock.advance(dt);
-    for (var i = 0; i < ticks && !_state.finished; i++) {
-      // Keyboard and touch can be used together.
-      final human = InputFrame(_keyboardInput.bits | touchInput.frame.bits);
-      final bot = botEnabled ? _bot.think(_state) : InputFrame.none;
-      final inputs = [human, bot];
-      _replay.record(inputs);
-      sim.step(_state, inputs);
-      _detectEvents();
+    if (online != null) {
+      _updateOnline(online!, dt);
+    } else {
+      if (pauseMenuOpen.value) return;
+      final ticks = _clock.advance(dt);
+      for (var i = 0; i < ticks && !_state.finished; i++) {
+        // Keyboard and touch can be used together.
+        final human = InputFrame(_keyboardInput.bits | touchInput.frame.bits);
+        final bot = botEnabled ? _bot.think(_state) : InputFrame.none;
+        final inputs = [human, bot];
+        _replay.record(inputs);
+        sim.step(_state, inputs);
+        _detectEvents();
+      }
     }
     if (_state.finished && result.value == null) {
       _replay.finalChecksum = _state.checksum();
       result.value = _state.winner;
     }
   }
+
+  // Online: the match can't pause, so an open menu only mutes this side's
+  // input. Ticking goes on after the result so the final inputs and
+  // checksums still reach the other player.
+  void _updateOnline(NetMatch net, double dt) {
+    final ticks = _clock.advance(dt);
+    for (var i = 0; i < ticks; i++) {
+      final human = pauseMenuOpen.value || _state.finished
+          ? InputFrame.none
+          : InputFrame(_keyboardInput.bits | touchInput.frame.bits);
+      net.tick(human);
+      _state = net.state;
+      _detectEvents();
+    }
+    if (connectionProblem.value == null && result.value == null) {
+      if (net.remoteQuit) {
+        connectionProblem.value = 'Opponent left';
+      } else if (net.ticksSinceHeard > 5 * 60) {
+        connectionProblem.value = 'Connection lost';
+      } else if (net.desynced) {
+        connectionProblem.value = 'Out of sync';
+      }
+    }
+  }
+
+  /// Leaves an online match, telling the other side.
+  void leaveOnline() => online?.quit();
 
   // Compare each fighter with the previous tick to trigger sparks, shake
   // and sounds.
@@ -388,9 +449,9 @@ class BrawlGame extends FlameGame with KeyboardEvents {
       feet: Offset(x, y),
       width: def.width.toDouble(),
       height: def.height.toDouble(),
-      rim: _slotColors[slot],
+      rim: _colorOf(slot),
       skin: flash ? _flashSkin(skin) : skin,
-      weapon: weaponArtFor(slot == 0 ? player.id : opponent.id),
+      weapon: weaponArtFor(entries[slot].id),
       opacity: f.dodgeFrame > 0 ? 0.35 : 1,
       pose: FighterPose(
         facing: f.facing,
@@ -421,7 +482,7 @@ class BrawlGame extends FlameGame with KeyboardEvents {
         ..lineTo(top.dx + 9, top.dy - 10)
         ..lineTo(top.dx, top.dy)
         ..close(),
-      Paint()..color = _slotColors[slot],
+      Paint()..color = _colorOf(slot),
     );
 
     if (debugView && attack != null && box != null) {
@@ -479,8 +540,11 @@ class BrawlGame extends FlameGame with KeyboardEvents {
   )!;
 
   void _renderHud(Canvas canvas) {
-    _renderPanel(canvas, 0, 'YOU', left: true);
-    _renderPanel(canvas, 1, botEnabled ? 'BOT' : 'DUMMY', left: false);
+    String label(int slot) => slot == localSlot
+        ? 'YOU'
+        : (isOnline ? 'OPPONENT' : (botEnabled ? 'BOT' : 'DUMMY'));
+    _renderPanel(canvas, 0, label(0), left: true);
+    _renderPanel(canvas, 1, label(1), left: false);
 
     final secondsLeft = (sim.ticksLeft(_state) + 59) ~/ 60;
     _clockText.render(
@@ -516,7 +580,7 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     required bool left,
   }) {
     final f = _state.fighters[slot];
-    final entry = slot == 0 ? player : opponent;
+    final entry = entries[slot];
     final x = left ? 20.0 : size.x - 20;
     final anchor = left ? Anchor.topLeft : Anchor.topRight;
     _smallText.render(canvas, label, Vector2(x, 10), anchor: anchor);
@@ -537,7 +601,7 @@ class BrawlGame extends FlameGame with KeyboardEvents {
         Offset(dx, 90),
         5,
         Paint()
-          ..color = i < f.stocks ? _slotColors[slot] : Colors.white24
+          ..color = i < f.stocks ? _colorOf(slot) : Colors.white24
           ..style = PaintingStyle.fill,
       );
     }
@@ -571,7 +635,7 @@ class BrawlGame extends FlameGame with KeyboardEvents {
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.keyR) restart();
-      if (key == LogicalKeyboardKey.keyT) botEnabled = !botEnabled;
+      if (key == LogicalKeyboardKey.keyT && !isOnline) botEnabled = !botEnabled;
       if (key == LogicalKeyboardKey.f3) debugView = !debugView;
       if (key == LogicalKeyboardKey.f5) saveReplay();
     }
@@ -581,17 +645,15 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     return KeyEventResult.handled;
   }
 
-  /// Writes the current match's inputs to the system temp folder and returns
-  /// the file. `Replay.fromJson` + `Replay.play` reproduce the match.
-  File saveReplay() {
-    final dir = Directory('${Directory.systemTemp.path}/brawl_replays')
-      ..createSync(recursive: true);
+  /// Saves the current match's inputs (native: the system temp folder).
+  /// `Replay.fromJson` + `Replay.play` reproduce the match.
+  String? saveReplay() {
     _replay.finalChecksum ??= _state.checksum();
-    final file = File(
-      '${dir.path}/replay_${DateTime.now().millisecondsSinceEpoch}.json',
-    )..writeAsStringSync(_replay.toJson());
-    debugPrint('Replay saved to ${file.path}');
-    return file;
+    final where = saveReplayFile(_replay);
+    debugPrint(
+      where == null ? 'Replays cannot be saved here' : 'Replay saved to $where',
+    );
+    return where;
   }
 }
 

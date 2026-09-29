@@ -16,7 +16,10 @@ class FighterSelectScreen extends StatefulWidget {
     required this.onFight,
     this.onTap,
     this.skinFor,
+    this.opponentLabel = 'Opponent: random bot (Normal)',
   });
+
+  final String opponentLabel;
 
   /// The equipped skin to preview on each card (null = default look).
   final Skin Function(String fighterId)? skinFor;
@@ -98,9 +101,9 @@ class _FighterSelectScreenState extends State<FighterSelectScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    'Opponent: random bot (Normal)',
-                    style: TextStyle(color: BrawlColors.muted),
+                  Text(
+                    widget.opponentLabel,
+                    style: const TextStyle(color: BrawlColors.muted),
                   ),
                   const SizedBox(width: 20),
                   FilledButton(

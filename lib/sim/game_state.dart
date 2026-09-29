@@ -1,4 +1,5 @@
 import 'fixed.dart';
+import 'int_math.dart';
 import 'input_frame.dart';
 
 /// Everything that changes during a match. Only plain data: no Flutter, no
@@ -173,10 +174,7 @@ class GameState {
 
   /// A value in `[0, maxExclusive)` from the seeded generator.
   int nextRandom(int maxExclusive) {
-    var x = rngState;
-    x ^= (x << 13) & 0xFFFFFFFF;
-    x ^= x >> 17;
-    x ^= (x << 5) & 0xFFFFFFFF;
+    final x = xorshift32(rngState);
     rngState = x;
     return x % maxExclusive;
   }
@@ -198,21 +196,14 @@ class GameState {
 
   static int _seedToRng(int seed) {
     // Xorshift gets stuck at 0, so replace it with a fixed non-zero value.
-    final s = seed & 0xFFFFFFFF;
+    final s = lo32(seed);
     return s == 0 ? 0x9E3779B9 : s;
   }
 }
 
-/// FNV-1a over 32-bit words.
+/// FNV-1a over 32-bit words (web-safe, see int_math.dart).
 class _Fnv {
-  int value = 0x811C9DC5;
+  int value = fnvStart;
 
-  void add(int v) {
-    _word(v & 0xFFFFFFFF);
-    _word((v >> 32) & 0xFFFFFFFF);
-  }
-
-  void _word(int w) {
-    value = ((value ^ w) * 0x01000193) & 0xFFFFFFFF;
-  }
+  void add(int v) => value = fnvAdd(value, v);
 }

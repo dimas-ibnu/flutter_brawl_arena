@@ -31,6 +31,17 @@ void main() {
       expect(code, isNot(contains('dart:ui')));
     });
 
+    // Bit operators truncate to 32 bits on web, which broke the stage
+    // (negative numbers turned positive). Only int_math.dart may use them,
+    // on values it keeps within 32 bits; input_frame.dart uses small flags.
+    if (name != 'int_math.dart') {
+      test('$name uses no web-unsafe bit shifts or 32-bit masks', () {
+        final shifts = RegExp(r'<<|>>|0xFFFFFFFF').allMatches(code).length;
+        final allowed = name == 'input_frame.dart' ? 1 : 0; // 1 << index
+        expect(shifts, allowed);
+      });
+    }
+
     if (name != 'fixed.dart') {
       test('$name uses no double', () {
         expect(RegExp(r'\bdouble\b').hasMatch(code), isFalse);
