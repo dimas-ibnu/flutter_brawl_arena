@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Brawl Arena never uses the camera. The online networking library (WebRTC) includes camera support, so iOS asks for this text.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Brawl Arena never uses the microphone. The online networking library (WebRTC) includes audio support, so iOS asks for this text.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

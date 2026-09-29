@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'game/sounds.dart';
+import 'net/online_service.dart';
 import 'ui/app.dart';
 
 /// Force the on-screen controls on desktop (mouse = one finger):
@@ -24,6 +25,7 @@ Future<void> main() async {
   final sounds = FlameSounds();
   final roster = await BrawlApp.loadRoster();
   final cosmetics = await BrawlApp.loadCosmetics(roster);
+  final onlineReady = await OnlineService.init();
   try {
     await sounds.load();
   } catch (e) {
@@ -34,6 +36,7 @@ Future<void> main() async {
     BrawlApp(
       roster: roster,
       cosmetics: cosmetics,
+      online: onlineReady ? OnlineService.instance : null,
       sounds: sounds,
       showTouchControls: isPhone || _forceTouchControls,
     ),

@@ -7,10 +7,14 @@ environment:
   sdk: ^3.12.1
 
 dependencies:
+  cloud_firestore: ^6.10.0
+  firebase_auth: ^6.7.0
+  firebase_core: ^4.15.0
   flame: ^1.38.2
   flame_audio: ^2.12.2
   flutter:
     sdk: flutter
+  flutter_webrtc: ^1.6.2+hotfix.3
   shared_preferences: ^2.5.5
 
 dev_dependencies:
