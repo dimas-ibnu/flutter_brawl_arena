@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
+import 'firebase_env.dart';
+
 import 'signaling.dart';
 import 'transport.dart';
 import 'webrtc_transport.dart';
@@ -14,14 +16,24 @@ class OnlineService {
 
   static OnlineService? _instance;
 
-  /// Null when Firebase isn't set up in this build (see README_ONLINE.md).
+  /// Null when Firebase failed to start (see README_ONLINE.md).
   static OnlineService? get instance => _instance;
 
-  /// Call once at startup. Returns false (and online stays off) when the
-  /// app has no Firebase configuration yet.
+  /// Call once at startup. Returns false (and online stays off) when this
+  /// build has no Firebase settings (see firebase_env.dart).
   static Future<bool> init() async {
+    final options = firebaseOptions;
+    if (options == null) {
+      debugPrint(
+        'Online play is off: build with '
+        '--dart-define-from-file=firebase.env.json',
+      );
+      return false;
+    }
     try {
-      if (Firebase.apps.isEmpty) await Firebase.initializeApp();
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(options: options);
+      }
       _instance = OnlineService._();
       return true;
     } catch (e) {

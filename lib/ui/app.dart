@@ -73,8 +73,9 @@ class BrawlApp extends StatelessWidget {
                 builder: (_) => const AlertDialog(
                   title: Text('Online play is not set up'),
                   content: Text(
-                    'This build has no Firebase project yet. Follow '
-                    'README_ONLINE.md (flutterfire configure), then rebuild.',
+                    'This build has no Firebase settings. Run it with '
+                    '--dart-define-from-file=firebase.env.json '
+                    '(see README_ONLINE.md).',
                   ),
                 ),
               );

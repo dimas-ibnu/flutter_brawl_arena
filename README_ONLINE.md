@@ -20,24 +20,45 @@ Until Firebase is set up, the game runs normally and **Play Online** shows a
    field `expireAt` for collection group `rooms` and another for
    collection group `messages`. Old rooms then delete themselves.
 
-## 2. Connect this app to the project
+## 2. Give the app its Firebase settings
+
+The Firebase config is **never committed**. The app reads it from
+`--dart-define` values; without them it builds and runs with online off.
+
+**Locally**: copy the template and fill in the values from the Firebase
+console (Project settings > Your apps), or from a one-off
+`flutterfire configure` run:
 
 ```bash
-npm install -g firebase-tools
-dart pub global activate flutterfire_cli
-firebase login
-flutterfire configure
+cp firebase.env.example.json firebase.env.json
 ```
 
-In `flutterfire configure`, pick your project and the platforms `android`,
-`ios` and `macos`. It adds `google-services.json` /
-`GoogleService-Info.plist` and `lib/firebase_options.dart`.
+`firebase.env.json` is git-ignored. Run or build with it:
 
-Then rebuild the app (`flutter run`).
+```bash
+flutter run --dart-define-from-file=firebase.env.json
+```
 
-> If Firebase still fails to start on a platform, pass the generated options
-> explicitly in `lib/net/online_service.dart`:
-> `Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)`.
+| Key | Where to find it |
+| --- | --- |
+| `FIREBASE_PROJECT_ID` | Project settings > General |
+| `FIREBASE_MESSAGING_SENDER_ID` | Project settings > Cloud Messaging (Sender ID) |
+| `FIREBASE_STORAGE_BUCKET` | Project settings > General (optional) |
+| `FIREBASE_ANDROID_API_KEY`, `FIREBASE_ANDROID_APP_ID` | Android app in Project settings |
+| `FIREBASE_APPLE_API_KEY`, `FIREBASE_APPLE_APP_ID`, `FIREBASE_APPLE_BUNDLE_ID` | iOS app in Project settings (macOS uses the same) |
+
+**In GitHub Actions**: save the whole `firebase.env.json` content as a
+repository secret named `FIREBASE_ENV_JSON`, then:
+
+```yaml
+- name: Firebase settings
+  run: echo '${{ secrets.FIREBASE_ENV_JSON }}' > firebase.env.json
+- name: Build
+  run: flutter build apk --release --dart-define-from-file=firebase.env.json
+```
+
+> These keys only identify the Firebase project; what protects the data is
+> `firestore.rules`. Keeping them out of git is still good hygiene.
 
 ## 3. Play
 
