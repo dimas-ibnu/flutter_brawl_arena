@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -63,12 +64,11 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
   }
 
   void _fail(Object error) {
+    debugPrint('Online error: $error');
     if (!mounted) return;
     setState(() {
       _phase = _Phase.failed;
-      _status = error is RoomNotFound || error is RoomFull
-          ? error.toString()
-          : 'Could not connect: $error';
+      _status = friendlyOnlineError(error);
     });
   }
 
@@ -336,4 +336,34 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
         ];
     }
   }
+}
+
+/// Short, readable text for online errors (the full error goes to the log).
+String friendlyOnlineError(Object error) {
+  if (error is RoomNotFound || error is RoomFull) return error.toString();
+  if (error is String) return 'Could not connect: $error';
+  if (error is FirebaseException) {
+    final auth = error.plugin == 'firebase_auth';
+    return switch (error.code) {
+      'operation-not-allowed' ||
+      'admin-restricted-operation' ||
+      'internal-error' when auth =>
+        'Online sign-in is off. In the Firebase console, enable '
+            'Authentication > Sign-in method > Anonymous.',
+      'network-request-failed' || 'unavailable' =>
+        'No internet connection. Check your network and try again.',
+      'permission-denied' =>
+        'The database refused the request. Publish firestore.rules in the '
+            'Firebase console (Firestore > Rules).',
+      'not-found' || 'failed-precondition' =>
+        'The online database is not set up. Create the Firestore database '
+            'in the Firebase console.',
+      _ => 'Could not connect (${error.code}). Try again in a moment.',
+    };
+  }
+  if (error is TimeoutException) {
+    return 'The other player could not be reached. Try again, or check '
+        'that both of you are online.';
+  }
+  return 'Could not connect. Try again in a moment.';
 }
