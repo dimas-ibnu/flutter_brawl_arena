@@ -54,7 +54,11 @@ class OnlineService {
 
   /// Creates a room. [onCode] gets the code to share; the future completes
   /// when a guest has joined and the connection is open.
-  Future<Transport> host({required void Function(String code) onCode}) async {
+  /// Completing [cancel] (e.g. the player left the lobby) closes the room.
+  Future<Transport> host({
+    required void Function(String code) onCode,
+    Future<void>? cancel,
+  }) async {
     await _signIn();
     final signaling = await FirestoreSignaling.host(_db);
     onCode(signaling.roomCode);
@@ -63,6 +67,7 @@ class OnlineService {
         signaling: signaling,
         isHost: true,
         timeout: const Duration(minutes: 10),
+        cancel: cancel,
       );
     } finally {
       await signaling.close();

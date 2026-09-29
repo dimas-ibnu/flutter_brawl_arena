@@ -16,6 +16,7 @@ import '../net/protocol.dart';
 import '../net/rollback_session.dart';
 import '../net/signaling.dart';
 import '../net/transport.dart';
+import '../net/webrtc_transport.dart';
 import '../sim/defs.dart';
 import '../sim/match_simulation.dart';
 import '../sim/rules_fingerprint.dart';
@@ -60,6 +61,7 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
   @override
   void dispose() {
     _cancelSearch = true;
+    _stopHosting();
     _timer?.cancel();
     if (!_started) _transport?.close();
     _codeField.dispose();
@@ -109,13 +111,23 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
     }
   }
 
+  /// Completed to close a room nobody has joined yet.
+  Completer<void>? _hostCancel;
+
+  void _stopHosting() {
+    final c = _hostCancel;
+    if (c != null && !c.isCompleted) c.complete();
+  }
+
   Future<void> _host() async {
+    final cancel = _hostCancel = Completer<void>();
     setState(() {
       _phase = _Phase.hosting;
       _status = 'Creating a room…';
     });
     try {
       final t = await widget.service.host(
+        cancel: cancel.future,
         onCode: (code) {
           if (!mounted) return;
           setState(() {
@@ -125,6 +137,14 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
         },
       );
       _handshake(t, isHost: true);
+    } on ConnectCancelled {
+      if (mounted) {
+        setState(() {
+          _phase = _Phase.choose;
+          _status = '';
+          _roomCode = null;
+        });
+      }
     } catch (e) {
       _fail(e);
     }
@@ -405,6 +425,14 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
           const CircularProgressIndicator(),
           const SizedBox(height: 12),
           Text(_status, textAlign: TextAlign.center),
+          if (_phase == _Phase.hosting) ...[
+            const SizedBox(height: 16),
+            OutlinedButton(
+              key: const Key('cancel-host'),
+              onPressed: _stopHosting,
+              child: const Text('Cancel'),
+            ),
+          ],
         ];
       case _Phase.failed:
         return [

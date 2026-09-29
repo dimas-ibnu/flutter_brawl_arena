@@ -48,6 +48,7 @@ class WebRtcTransport implements Transport {
     required Signaling signaling,
     required bool isHost,
     Duration timeout = const Duration(seconds: 30),
+    Future<void>? cancel,
   }) async {
     final pc = await createPeerConnection(iceServers);
     final opened = Completer<RTCDataChannel>();
@@ -129,7 +130,11 @@ class WebRtcTransport implements Transport {
       } else {
         pc.onDataChannel = watch;
       }
-      final channel = await opened.future.timeout(timeout);
+      final channel = await Future.any([
+        opened.future,
+        if (cancel != null)
+          cancel.then<RTCDataChannel>((_) => throw ConnectCancelled()),
+      ]).timeout(timeout);
       return WebRtcTransport._(pc, channel);
     } catch (_) {
       await pc.close();
@@ -165,4 +170,10 @@ class WebRtcTransport implements Transport {
       await _pc.close();
     });
   }
+}
+
+/// The player left before the other side connected.
+class ConnectCancelled implements Exception {
+  @override
+  String toString() => 'Cancelled';
 }

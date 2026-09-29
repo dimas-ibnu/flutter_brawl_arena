@@ -42,7 +42,9 @@ service cloud.firestore {
         allow create: if request.auth != null
           && request.resource.data.from in ['host', 'guest']
           && request.resource.data.kind in ['offer', 'answer', 'candidate'];
-        allow update, delete: if false;
+        allow update: if false;
+        // Each side removes its setup messages once connected.
+        allow delete: if request.auth != null;
       }
     }
   }

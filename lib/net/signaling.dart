@@ -116,17 +116,31 @@ class FirestoreSignaling implements Signaling {
 
   @override
   Future<void> close() async {
+    if (_closed) return;
+    _closed = true;
     await _sub.cancel();
     await _messages.close();
-    // The host removes the room once the players are connected or gone.
-    if (_isHost) {
-      try {
-        await _room.delete();
-      } catch (_) {
-        // Already gone or offline; rooms also expire (see firestore.rules).
+    // Signaling is only needed until WebRTC connects. Firestore does not
+    // delete subcollections with their parent, so remove the messages
+    // first, then (host) the room itself. Anything left behind by a crash
+    // is removed by the TTL policy on `expireAt` (see README_ONLINE.md).
+    try {
+      final mine = await _room
+          .collection('messages')
+          .where('from', isEqualTo: _isHost ? 'host' : 'guest')
+          .get();
+      final batch = _db.batch();
+      for (final d in mine.docs) {
+        batch.delete(d.reference);
       }
+      if (_isHost) batch.delete(_room);
+      await batch.commit();
+    } catch (_) {
+      // Offline or already gone; the TTL policy cleans up later.
     }
   }
+
+  bool _closed = false;
 }
 
 /// Rooms and their messages are deleted automatically an hour later by a
