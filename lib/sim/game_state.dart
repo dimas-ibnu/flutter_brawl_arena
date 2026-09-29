@@ -13,6 +13,9 @@ class FighterState {
     this.facing = 1,
     this.grounded = false,
     this.airJumpsLeft = 0,
+    this.attackFrame = 0,
+    this.attackHit = false,
+    this.hitstun = 0,
     this.damage = 0,
     required this.stocks,
     this.lastInput = InputFrame.none,
@@ -29,6 +32,15 @@ class FighterState {
   bool grounded;
   int airJumpsLeft;
 
+  /// Ticks into the current attack, counting from 1; 0 = not attacking.
+  int attackFrame;
+
+  /// True once the current attack has connected, so it hits only once.
+  bool attackHit;
+
+  /// Ticks left where this fighter can't act after being hit.
+  int hitstun;
+
   /// Damage percent. Higher damage means bigger knockback.
   int damage;
   int stocks;
@@ -44,6 +56,9 @@ class FighterState {
     facing: facing,
     grounded: grounded,
     airJumpsLeft: airJumpsLeft,
+    attackFrame: attackFrame,
+    attackHit: attackHit,
+    hitstun: hitstun,
     damage: damage,
     stocks: stocks,
     lastInput: lastInput,
@@ -57,6 +72,9 @@ class FighterState {
     ..add(facing)
     ..add(grounded ? 1 : 0)
     ..add(airJumpsLeft)
+    ..add(attackFrame)
+    ..add(attackHit ? 1 : 0)
+    ..add(hitstun)
     ..add(damage)
     ..add(stocks)
     ..add(lastInput.bits);
