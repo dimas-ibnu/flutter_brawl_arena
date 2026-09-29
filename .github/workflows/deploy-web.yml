@@ -3,10 +3,11 @@ name: Deploy web to GitHub Pages
 # Builds the web version with the Firebase settings from the
 # FIREBASE_ENV_JSON secret and publishes it to GitHub Pages:
 # https://<owner>.github.io/<repo>/
+# Only changes landing on main (a direct push or a merged pull request)
+# deploy. Other branches and open pull requests never run this.
 on:
   push:
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: read
