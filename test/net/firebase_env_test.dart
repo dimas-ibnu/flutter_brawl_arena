@@ -34,6 +34,28 @@ void main() {
     expect(build(TargetPlatform.macOS)?.$1, 'i-key');
   });
 
+  test('web uses the web app registration', () {
+    final o = optionsFor(
+      TargetPlatform.android, // a phone browser still reports its OS
+      web: true,
+      projectId: 'proj',
+      senderId: '123',
+      androidApiKey: 'a-key',
+      androidAppId: 'a-app',
+      webApiKey: 'w-key',
+      webAppId: 'w-app',
+      webAuthDomain: 'proj.firebaseapp.com',
+    );
+    expect(
+      (o?.apiKey, o?.appId, o?.authDomain),
+      ('w-key', 'w-app', 'proj.firebaseapp.com'),
+    );
+    expect(
+      optionsFor(TargetPlatform.android, web: true, projectId: 'p'),
+      isNull,
+    );
+  });
+
   test('unsupported platforms and partial settings give no options', () {
     expect(build(TargetPlatform.windows), isNull);
     expect(

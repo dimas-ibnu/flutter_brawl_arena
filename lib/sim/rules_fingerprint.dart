@@ -1,4 +1,5 @@
 import 'defs.dart';
+import 'int_math.dart';
 import 'match_simulation.dart';
 
 /// Bump when the simulation code changes how a match plays, even if no
@@ -10,12 +11,8 @@ const int simulationVersion = 1;
 /// numbers and moves. Two devices can only play online if these match;
 /// otherwise the same inputs give different results (a desync).
 int rulesFingerprint(MatchSimulation sim, List<FighterDef> roster) {
-  var h = 0x811C9DC5;
-  void add(int v) {
-    for (final w in [v & 0xFFFFFFFF, (v >> 32) & 0xFFFFFFFF]) {
-      h = ((h ^ w) * 0x01000193) & 0xFFFFFFFF;
-    }
-  }
+  var h = fnvStart;
+  void add(int v) => h = fnvAdd(h, v);
 
   add(simulationVersion);
   add(sim.startingStocks);

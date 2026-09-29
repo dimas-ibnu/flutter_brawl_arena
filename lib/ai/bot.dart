@@ -1,6 +1,7 @@
 import '../sim/defs.dart';
 import '../sim/fixed.dart';
 import '../sim/game_state.dart';
+import '../sim/int_math.dart';
 import '../sim/input_frame.dart';
 import '../sim/match_simulation.dart';
 
@@ -113,7 +114,7 @@ class Bot {
   ];
 
   void reset() {
-    _rng = (seed & 0xFFFFFFFF) == 0 ? 0x2545F491 : seed & 0xFFFFFFFF;
+    _rng = lo32(seed) == 0 ? 0x2545F491 : lo32(seed);
     _seen.clear();
     _last = InputFrame.none;
     _thinkTimer =
@@ -367,10 +368,7 @@ class Bot {
   // ---- Randomness (xorshift32, separate from the game state) ----
 
   int _rand(int maxExclusive) {
-    var x = _rng;
-    x ^= (x << 13) & 0xFFFFFFFF;
-    x ^= x >> 17;
-    x ^= (x << 5) & 0xFFFFFFFF;
+    final x = xorshift32(_rng);
     _rng = x;
     return x % maxExclusive;
   }

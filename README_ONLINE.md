@@ -17,8 +17,8 @@ Until Firebase is set up, the game runs normally and **Play Online** shows a
 4. **Firestore > Rules**: paste the contents of [`firestore.rules`](firestore.rules)
    and publish.
 5. Optional but recommended: **Firestore > TTL policies**, add a policy on
-   field `expireAt` for collection group `rooms` and another for
-   collection group `messages`. Old rooms then delete themselves.
+   field `expireAt` for collection groups `rooms`, `messages` and
+   `queue`. Old rooms and abandoned queue tickets then delete themselves.
 
 ## 2. Give the app its Firebase settings
 
@@ -46,6 +46,7 @@ flutter run --dart-define-from-file=firebase.env.json
 | `FIREBASE_STORAGE_BUCKET` | Project settings > General (optional) |
 | `FIREBASE_ANDROID_API_KEY`, `FIREBASE_ANDROID_APP_ID` | Android app in Project settings |
 | `FIREBASE_APPLE_API_KEY`, `FIREBASE_APPLE_APP_ID`, `FIREBASE_APPLE_BUNDLE_ID` | iOS app in Project settings (macOS uses the same) |
+| `FIREBASE_WEB_API_KEY`, `FIREBASE_WEB_APP_ID`, `FIREBASE_WEB_AUTH_DOMAIN` | Web app in Project settings |
 
 **In GitHub Actions**: save the whole `firebase.env.json` content as a
 repository secret named `FIREBASE_ENV_JSON`, then:
@@ -63,8 +64,11 @@ repository secret named `FIREBASE_ENV_JSON`, then:
 ## 3. Play
 
 1. Both players: **Play Online**, pick a fighter.
-2. One player: **Host a room**, share the code.
-3. The other: type the code, **Join**.
+2. **Quick match**: tap it and wait; you are paired with the next player
+   who is also searching (no code needed). The one who joined the queue
+   later hosts.
+3. **Private game**: one player taps **Host a private room** and shares the
+   code; the other types it and taps **Join**.
 
 The host is player 1 (left panel), the guest player 2. Skins and the host's
 stage palette carry over.

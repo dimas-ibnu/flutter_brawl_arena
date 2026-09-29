@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flame/components.dart';
@@ -14,6 +13,7 @@ import '../input/keyboard_input.dart';
 import '../input/touch_input.dart';
 import '../net/net_match.dart';
 import '../replay/replay.dart';
+import '../replay/replay_file.dart';
 import '../sim/defs.dart';
 import '../sim/game_state.dart';
 import '../sim/input_frame.dart';
@@ -645,17 +645,15 @@ class BrawlGame extends FlameGame with KeyboardEvents {
     return KeyEventResult.handled;
   }
 
-  /// Writes the current match's inputs to the system temp folder and returns
-  /// the file. `Replay.fromJson` + `Replay.play` reproduce the match.
-  File saveReplay() {
-    final dir = Directory('${Directory.systemTemp.path}/brawl_replays')
-      ..createSync(recursive: true);
+  /// Saves the current match's inputs (native: the system temp folder).
+  /// `Replay.fromJson` + `Replay.play` reproduce the match.
+  String? saveReplay() {
     _replay.finalChecksum ??= _state.checksum();
-    final file = File(
-      '${dir.path}/replay_${DateTime.now().millisecondsSinceEpoch}.json',
-    )..writeAsStringSync(_replay.toJson());
-    debugPrint('Replay saved to ${file.path}');
-    return file;
+    final where = saveReplayFile(_replay);
+    debugPrint(
+      where == null ? 'Replays cannot be saved here' : 'Replay saved to $where',
+    );
+    return where;
   }
 }
 

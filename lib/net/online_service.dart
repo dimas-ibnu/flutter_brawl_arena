@@ -4,6 +4,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 
 import 'firebase_env.dart';
+import 'firestore_queue.dart';
+import 'matchmaking.dart';
 
 import 'signaling.dart';
 import 'transport.dart';
@@ -64,6 +66,54 @@ class OnlineService {
       );
     } finally {
       await signaling.close();
+    }
+  }
+
+  /// Quick match: waits in the queue until paired with another player, then
+  /// connects. Returns the connection and whether we host (slot 0).
+  /// Throws [MatchmakingCancelled] once [cancelled] returns true.
+  Future<(Transport, bool)> quickMatch({
+    required bool Function() cancelled,
+    void Function(Duration waited)? onWaiting,
+    void Function()? onFound,
+  }) async {
+    await _signIn();
+    final matchmaker = Matchmaker<FirestoreSignaling>(
+      queue: FirestoreQueue(_db),
+      ownerId: FirebaseAuth.instance.currentUser!.uid,
+      createRoom: () => FirestoreSignaling.host(_db),
+      roomCode: (room) => room.roomCode,
+      discardRoom: (room) => room.close(),
+    );
+    final pairing = await matchmaker.find(
+      cancelled: cancelled,
+      onWaiting: onWaiting,
+    );
+    onFound?.call();
+
+    if (pairing.isHost) {
+      final signaling = pairing.hostRoom!;
+      try {
+        final t = await WebRtcTransport.connect(
+          signaling: signaling,
+          isHost: true,
+          timeout: const Duration(seconds: 25),
+        );
+        return (t as Transport, true);
+      } finally {
+        await signaling.close();
+      }
+    }
+
+    // Guest: the host's room already exists; retry briefly in case our
+    // read races its creation.
+    for (var attempt = 0; ; attempt++) {
+      try {
+        return (await join(pairing.roomCode), false);
+      } on RoomNotFound {
+        if (attempt >= 3) rethrow;
+        await Future<void>.delayed(const Duration(seconds: 1));
+      }
     }
   }
 

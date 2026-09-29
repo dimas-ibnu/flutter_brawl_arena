@@ -4,6 +4,26 @@ rules_version = '2';
 // messages. Game traffic goes peer to peer over WebRTC, not through here.
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Quick match queue (lib/net/firestore_queue.dart). The owner creates,
+    // refreshes and deletes its ticket; another player may only claim a
+    // waiting ticket (waiting -> matched, with a room code).
+    match /queue/{ticket} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.state == 'waiting';
+      allow update: if request.auth != null && (
+        (resource.data.owner == request.auth.uid
+          && request.resource.data.owner == resource.data.owner)
+        || (resource.data.state == 'waiting'
+          && request.resource.data.state == 'matched'
+          && request.resource.data.room is string
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['state', 'room'])));
+      allow delete: if request.auth != null
+        && resource.data.owner == request.auth.uid;
+    }
+
     match /rooms/{code} {
       allow read: if request.auth != null;
       // The host opens a room.

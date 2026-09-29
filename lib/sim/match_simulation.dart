@@ -420,7 +420,7 @@ class MatchSimulation {
     final left = stage.groundLeft + spawnEdgeMargin;
     final range = (stage.groundRight - spawnEdgeMargin - left).floorToInt();
     Fx distanceToNearest(Fx x) {
-      var nearest = Fx.fromInt(1 << 14);
+      var nearest = Fx.fromInt(16384);
       for (var i = 0; i < state.fighters.length; i++) {
         final o = state.fighters[i];
         if (i == slot || !o.inPlay) continue;

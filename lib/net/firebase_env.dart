@@ -27,10 +27,16 @@ abstract final class FirebaseEnv {
   static const appleBundleId = String.fromEnvironment(
     'FIREBASE_APPLE_BUNDLE_ID',
   );
+  static const webApiKey = String.fromEnvironment('FIREBASE_WEB_API_KEY');
+  static const webAppId = String.fromEnvironment('FIREBASE_WEB_APP_ID');
+  static const webAuthDomain = String.fromEnvironment(
+    'FIREBASE_WEB_AUTH_DOMAIN',
+  );
 }
 
 /// Options for the current platform, or null when not configured.
-FirebaseOptions? get firebaseOptions => optionsFor(defaultTargetPlatform);
+FirebaseOptions? get firebaseOptions =>
+    optionsFor(defaultTargetPlatform, web: kIsWeb);
 
 FirebaseOptions? optionsFor(
   TargetPlatform platform, {
@@ -42,7 +48,26 @@ FirebaseOptions? optionsFor(
   String appleApiKey = FirebaseEnv.appleApiKey,
   String appleAppId = FirebaseEnv.appleAppId,
   String appleBundleId = FirebaseEnv.appleBundleId,
+  bool web = false,
+  String webApiKey = FirebaseEnv.webApiKey,
+  String webAppId = FirebaseEnv.webAppId,
+  String webAuthDomain = FirebaseEnv.webAuthDomain,
 }) {
+  // In a browser, defaultTargetPlatform is the device's OS; the web app
+  // registration applies instead.
+  if (web) {
+    if (projectId.isEmpty || webApiKey.isEmpty || webAppId.isEmpty) {
+      return null;
+    }
+    return FirebaseOptions(
+      apiKey: webApiKey,
+      appId: webAppId,
+      messagingSenderId: senderId,
+      projectId: projectId,
+      authDomain: webAuthDomain.isEmpty ? null : webAuthDomain,
+      storageBucket: bucket.isEmpty ? null : bucket,
+    );
+  }
   final (apiKey, appId) = switch (platform) {
     TargetPlatform.android => (androidApiKey, androidAppId),
     TargetPlatform.iOS || TargetPlatform.macOS => (appleApiKey, appleAppId),

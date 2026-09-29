@@ -1,0 +1,185 @@
+// Frozen copy of assets/data/fighters.json for the cross-platform golden
+// test. It never reads files, so it also runs compiled to JavaScript.
+// Balance changes to the real file do not affect it.
+const fightersFixture = r'''
+{
+  "knight": {
+    "name": "Knight",
+    "weapon": "Sword",
+    "style": "Big hits, hard to launch",
+    "width": 48,
+    "height": 96,
+    "weight": 115,
+    "walkSpeed": 6,
+    "groundAccel": 6,
+    "airAccel": 0.4,
+    "attackFriction": 1,
+    "knockbackDrag": 0.25,
+    "gravity": 0.6,
+    "maxFallSpeed": 16,
+    "jumpSpeed": 15,
+    "airJumpSpeed": 13,
+    "fastFallSpeed": 24,
+    "airJumps": 2,
+    "dodge": { "frames": 18, "speed": 10, "cooldown": 50 },
+    "moves": {
+      "neutralLight": {
+        "startup": 5, "active": 3, "recovery": 12, "damage": 7,
+        "knockback": { "base": 5, "growth": 14 }, "launch": [0.8, -0.6],
+        "hitbox": { "forward": 50, "up": 60, "width": 60, "height": 32 }
+      },
+      "sideLight": {
+        "startup": 7, "active": 4, "recovery": 14, "damage": 9,
+        "knockback": { "base": 6, "growth": 16 }, "launch": [0.9, -0.44],
+        "hitbox": { "forward": 60, "up": 50, "width": 70, "height": 30 },
+        "selfVelocity": [9, 0]
+      },
+      "downLight": {
+        "startup": 6, "active": 3, "recovery": 14, "damage": 8,
+        "knockback": { "base": 5, "growth": 12 }, "launch": [0.5, -0.87],
+        "hitbox": { "forward": 44, "up": 12, "width": 70, "height": 24 }
+      },
+      "neutralAir": {
+        "startup": 5, "active": 5, "recovery": 12, "damage": 8,
+        "knockback": { "base": 5, "growth": 14 }, "launch": [0.6, -0.8],
+        "launchAway": true,
+        "hitbox": { "forward": 0, "up": 48, "width": 110, "height": 50 },
+        "endsOnLanding": true
+      },
+      "sideAir": {
+        "startup": 6, "active": 4, "recovery": 14, "damage": 9,
+        "knockback": { "base": 6, "growth": 16 }, "launch": [0.87, -0.5],
+        "hitbox": { "forward": 56, "up": 48, "width": 64, "height": 36 },
+        "endsOnLanding": true
+      },
+      "downAir": {
+        "startup": 7, "active": 5, "recovery": 14, "damage": 10,
+        "knockback": { "base": 6, "growth": 15 }, "launch": [0.3, 0.95],
+        "hitbox": { "forward": 10, "up": -10, "width": 60, "height": 40 },
+        "endsOnLanding": true
+      },
+      "neutralHeavy": {
+        "startup": 14, "active": 4, "recovery": 22, "damage": 16,
+        "knockback": { "base": 9, "growth": 30 }, "launch": [0.6, -0.8],
+        "hitbox": { "forward": 20, "up": 90, "width": 90, "height": 60 }
+      },
+      "sideHeavy": {
+        "startup": 16, "active": 4, "recovery": 24, "damage": 18,
+        "knockback": { "base": 10, "growth": 34 }, "launch": [0.87, -0.5],
+        "hitbox": { "forward": 70, "up": 50, "width": 90, "height": 40 },
+        "selfVelocity": [4, 0]
+      },
+      "downHeavy": {
+        "startup": 15, "active": 5, "recovery": 24, "damage": 15,
+        "knockback": { "base": 9, "growth": 28 }, "launch": [0.9, -0.44],
+        "launchAway": true,
+        "hitbox": { "forward": 0, "up": 16, "width": 180, "height": 30 }
+      },
+      "recovery": {
+        "startup": 6, "active": 10, "recovery": 20, "damage": 10,
+        "knockback": { "base": 7, "growth": 16 }, "launch": [0.3, -0.95],
+        "hitbox": { "forward": 20, "up": 80, "width": 60, "height": 70 },
+        "selfVelocity": [3, -17],
+        "endsOnLanding": true
+      },
+      "groundPound": {
+        "startup": 8, "active": 20, "recovery": 16, "damage": 12,
+        "knockback": { "base": 7, "growth": 20 }, "launch": [0.9, -0.44],
+        "launchAway": true,
+        "hitbox": { "forward": 0, "up": 0, "width": 70, "height": 40 },
+        "selfVelocity": [0, 16],
+        "endsOnLanding": true
+      }
+    }
+  },
+  "ranger": {
+    "name": "Ranger",
+    "weapon": "Spear",
+    "style": "Fast combos, strong recovery",
+    "width": 40,
+    "height": 88,
+    "weight": 90,
+    "walkSpeed": 8,
+    "groundAccel": 8,
+    "airAccel": 0.5,
+    "attackFriction": 1,
+    "knockbackDrag": 0.25,
+    "gravity": 0.5,
+    "maxFallSpeed": 14,
+    "jumpSpeed": 14,
+    "airJumpSpeed": 12,
+    "fastFallSpeed": 21,
+    "airJumps": 2,
+    "dodge": { "frames": 16, "speed": 12, "cooldown": 40 },
+    "moves": {
+      "neutralLight": {
+        "startup": 3, "active": 3, "recovery": 9, "damage": 5,
+        "knockback": { "base": 4, "growth": 12 }, "launch": [0.8, -0.6],
+        "hitbox": { "forward": 54, "up": 56, "width": 72, "height": 24 }
+      },
+      "sideLight": {
+        "startup": 5, "active": 4, "recovery": 12, "damage": 7,
+        "knockback": { "base": 5, "growth": 14 }, "launch": [0.9, -0.44],
+        "hitbox": { "forward": 66, "up": 48, "width": 80, "height": 24 },
+        "selfVelocity": [11, 0]
+      },
+      "downLight": {
+        "startup": 4, "active": 3, "recovery": 11, "damage": 6,
+        "knockback": { "base": 4, "growth": 11 }, "launch": [0.5, -0.87],
+        "hitbox": { "forward": 50, "up": 12, "width": 80, "height": 22 }
+      },
+      "neutralAir": {
+        "startup": 4, "active": 5, "recovery": 10, "damage": 6,
+        "knockback": { "base": 4, "growth": 13 }, "launch": [0.6, -0.8],
+        "launchAway": true,
+        "hitbox": { "forward": 0, "up": 44, "width": 100, "height": 44 },
+        "endsOnLanding": true
+      },
+      "sideAir": {
+        "startup": 4, "active": 4, "recovery": 11, "damage": 7,
+        "knockback": { "base": 5, "growth": 14 }, "launch": [0.87, -0.5],
+        "hitbox": { "forward": 60, "up": 44, "width": 76, "height": 26 },
+        "endsOnLanding": true
+      },
+      "downAir": {
+        "startup": 5, "active": 5, "recovery": 12, "damage": 8,
+        "knockback": { "base": 5, "growth": 13 }, "launch": [0.3, 0.95],
+        "hitbox": { "forward": 8, "up": -8, "width": 50, "height": 40 },
+        "endsOnLanding": true
+      },
+      "neutralHeavy": {
+        "startup": 11, "active": 4, "recovery": 19, "damage": 13,
+        "knockback": { "base": 8, "growth": 27 }, "launch": [0.5, -0.87],
+        "hitbox": { "forward": 16, "up": 96, "width": 70, "height": 70 }
+      },
+      "sideHeavy": {
+        "startup": 13, "active": 4, "recovery": 21, "damage": 15,
+        "knockback": { "base": 9, "growth": 31 }, "launch": [0.87, -0.5],
+        "hitbox": { "forward": 80, "up": 48, "width": 100, "height": 30 },
+        "selfVelocity": [5, 0]
+      },
+      "downHeavy": {
+        "startup": 12, "active": 5, "recovery": 21, "damage": 13,
+        "knockback": { "base": 8, "growth": 26 }, "launch": [0.9, -0.44],
+        "launchAway": true,
+        "hitbox": { "forward": 0, "up": 14, "width": 170, "height": 28 }
+      },
+      "recovery": {
+        "startup": 5, "active": 10, "recovery": 18, "damage": 9,
+        "knockback": { "base": 6, "growth": 15 }, "launch": [0.3, -0.95],
+        "hitbox": { "forward": 18, "up": 76, "width": 56, "height": 66 },
+        "selfVelocity": [3, -16],
+        "endsOnLanding": true
+      },
+      "groundPound": {
+        "startup": 7, "active": 20, "recovery": 14, "damage": 10,
+        "knockback": { "base": 6, "growth": 18 }, "launch": [0.9, -0.44],
+        "launchAway": true,
+        "hitbox": { "forward": 0, "up": 0, "width": 64, "height": 36 },
+        "selfVelocity": [0, 14],
+        "endsOnLanding": true
+      }
+    }
+  }
+}
+''';

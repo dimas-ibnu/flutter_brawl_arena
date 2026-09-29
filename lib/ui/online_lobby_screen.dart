@@ -9,6 +9,7 @@ import '../data/cosmetics_store.dart';
 import '../data/roster.dart';
 import '../game/sounds.dart';
 import '../net/lobby.dart';
+import '../net/matchmaking.dart';
 import '../net/net_match.dart';
 import '../net/online_service.dart';
 import '../net/protocol.dart';
@@ -45,7 +46,7 @@ class OnlineLobbyScreen extends StatefulWidget {
   State<OnlineLobbyScreen> createState() => _OnlineLobbyScreenState();
 }
 
-enum _Phase { choose, hosting, joining, handshake, failed }
+enum _Phase { choose, searching, hosting, joining, handshake, failed }
 
 class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
   _Phase _phase = _Phase.choose;
@@ -58,6 +59,7 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
 
   @override
   void dispose() {
+    _cancelSearch = true;
     _timer?.cancel();
     if (!_started) _transport?.close();
     _codeField.dispose();
@@ -71,6 +73,40 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
       _phase = _Phase.failed;
       _status = friendlyOnlineError(error);
     });
+  }
+
+  bool _cancelSearch = false;
+  Duration _waited = Duration.zero;
+
+  /// Quick match: queue up and play whoever else is waiting.
+  Future<void> _quickMatch() async {
+    _cancelSearch = false;
+    setState(() {
+      _phase = _Phase.searching;
+      _waited = Duration.zero;
+      _status = 'Looking for an opponent…';
+    });
+    try {
+      final (transport, isHost) = await widget.service.quickMatch(
+        cancelled: () => _cancelSearch,
+        onWaiting: (d) {
+          if (mounted) setState(() => _waited = d);
+        },
+        onFound: () {
+          if (mounted) setState(() => _status = 'Opponent found! Connecting…');
+        },
+      );
+      _handshake(transport, isHost: isHost);
+    } on MatchmakingCancelled {
+      if (mounted) {
+        setState(() {
+          _phase = _Phase.choose;
+          _status = '';
+        });
+      }
+    } catch (e) {
+      _fail(e);
+    }
   }
 
   Future<void> _host() async {
@@ -261,14 +297,32 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
       case _Phase.choose:
         return [
           FilledButton.icon(
+            key: const Key('quick-match'),
+            onPressed: _quickMatch,
+            icon: const Icon(Icons.bolt),
+            label: const Text('Quick match'),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Play the next person who is searching',
+            style: TextStyle(color: BrawlColors.muted),
+          ),
+          const SizedBox(height: 20),
+          const Divider(),
+          const Text(
+            'Play with a friend',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
             key: const Key('host'),
             onPressed: _host,
             icon: const Icon(Icons.add),
-            label: const Text('Host a room'),
+            label: const Text('Host a private room'),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           const Text(
-            'or join a friend',
+            'or join with a code',
             style: TextStyle(color: BrawlColors.muted),
           ),
           const SizedBox(height: 8),
@@ -303,6 +357,28 @@ class _OnlineLobbyScreenState extends State<OnlineLobbyScreen> {
             const SizedBox(height: 8),
             Text(_status, style: const TextStyle(color: BrawlColors.muted)),
           ],
+        ];
+      case _Phase.searching:
+        final secs = _waited.inSeconds;
+        return [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 12),
+          Text(_status, textAlign: TextAlign.center),
+          const SizedBox(height: 4),
+          Text(
+            '${secs ~/ 60}:${(secs % 60).toString().padLeft(2, '0')}',
+            key: const Key('search-time'),
+            style: const TextStyle(color: BrawlColors.muted),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton(
+            key: const Key('cancel-search'),
+            onPressed: () {
+              _cancelSearch = true;
+              setState(() => _status = 'Cancelling…');
+            },
+            child: const Text('Cancel'),
+          ),
         ];
       case _Phase.hosting || _Phase.joining || _Phase.handshake:
         return [
