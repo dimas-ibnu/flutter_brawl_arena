@@ -1,0 +1,130 @@
+{
+  "skins": {
+    "knight_classic": {
+      "name": "Classic",
+      "fighter": "knight",
+      "default": true,
+      "unlock": "free"
+    },
+    "knight_neon": {
+      "name": "Neon Knight",
+      "fighter": "knight",
+      "unlock": "ad",
+      "rim": "#FF3DF5",
+      "body": "#0A0620",
+      "weapon": { "color": "#00E5FF", "glow": 10, "length": 1.3 },
+      "trail": { "color": "#FF3DF5", "length": 8 },
+      "sparks": { "color": "#00E5FF", "shape": "star" },
+      "ko": "#FF3DF5",
+      "accessories": [{ "type": "cape", "color": "#3A0A5C", "size": 1.0 }]
+    },
+    "knight_ember": {
+      "name": "Ember",
+      "fighter": "knight",
+      "unlock": "ad",
+      "rim": "#FF6D00",
+      "body": "#1A0800",
+      "weapon": { "color": "#FFAB40", "glow": 12, "length": 1.1 },
+      "trail": { "color": "#FF3D00", "length": 10 },
+      "sparks": { "color": "#FFAB40", "shape": "shard" },
+      "ko": "#FF3D00",
+      "accessories": [{ "type": "horns", "color": "#3E1400", "size": 1.0 }]
+    },
+    "knight_frost": {
+      "name": "Frost",
+      "fighter": "knight",
+      "unlock": "ad",
+      "rim": "#B3E5FC",
+      "body": "#06121C",
+      "weapon": { "color": "#E1F5FE", "glow": 8, "length": 1.2 },
+      "trail": { "color": "#81D4FA", "length": 6 },
+      "sparks": { "color": "#E1F5FE", "shape": "shard" },
+      "ko": "#B3E5FC",
+      "accessories": [{ "type": "crown", "color": "#81D4FA", "size": 1.0 }]
+    },
+    "ranger_classic": {
+      "name": "Classic",
+      "fighter": "ranger",
+      "default": true,
+      "unlock": "free"
+    },
+    "ranger_jade": {
+      "name": "Jade Ranger",
+      "fighter": "ranger",
+      "unlock": "ad",
+      "rim": "#00E676",
+      "body": "#021A0E",
+      "weapon": { "color": "#B9F6CA", "glow": 8, "length": 1.1 },
+      "trail": { "color": "#00E676", "length": 7 },
+      "sparks": { "color": "#B9F6CA", "shape": "dot" },
+      "ko": "#00E676",
+      "accessories": [{ "type": "scarf", "color": "#00C853", "size": 1.0 }]
+    },
+    "ranger_shadow": {
+      "name": "Shadow",
+      "fighter": "ranger",
+      "unlock": "ad",
+      "rim": "#7C4DFF",
+      "body": "#000000",
+      "weapon": { "color": "#B388FF", "glow": 14, "length": 1.25 },
+      "trail": { "color": "#651FFF", "length": 12 },
+      "sparks": { "color": "#B388FF", "shape": "star" },
+      "ko": "#7C4DFF",
+      "accessories": [
+        { "type": "cape", "color": "#12002E", "size": 0.8 },
+        { "type": "horns", "color": "#12002E", "size": 0.7 }
+      ]
+    },
+    "ranger_solar": {
+      "name": "Solar",
+      "fighter": "ranger",
+      "unlock": "ad",
+      "rim": "#FFD600",
+      "body": "#1A1400",
+      "weapon": { "color": "#FFF59D", "glow": 12, "length": 1.0 },
+      "trail": { "color": "#FFD600", "length": 8 },
+      "sparks": { "color": "#FFF59D", "shape": "star" },
+      "ko": "#FFD600",
+      "accessories": [
+        { "type": "crown", "color": "#FFD600", "size": 0.9 },
+        { "type": "scarf", "color": "#FF8F00", "size": 0.9 }
+      ]
+    }
+  },
+  "stagePalettes": {
+    "sunset": {
+      "name": "Sunset",
+      "default": true,
+      "unlock": "free",
+      "sky": ["#1B1446", "#5B2A86", "#D9467A", "#FFA24C"],
+      "sun": "#FFE7A3",
+      "mountains": ["#B0507F", "#7A2E6E", "#3F1B52"],
+      "mist": "#261238",
+      "platformTop": "#3B2A52",
+      "platformEdge": "#7CF0B0",
+      "platformUnder": ["#2A1B3D", "#120B1C"]
+    },
+    "midnight": {
+      "name": "Midnight",
+      "unlock": "ad",
+      "sky": ["#020617", "#0B1A3A", "#1E3A6E", "#4A6FA5"],
+      "sun": "#E8F0FF",
+      "mountains": ["#2B4B7E", "#1A2F57", "#0C1733"],
+      "mist": "#060C1F",
+      "platformTop": "#1C2A48",
+      "platformEdge": "#8AB4FF",
+      "platformUnder": ["#111C33", "#050A14"]
+    },
+    "toxic": {
+      "name": "Toxic",
+      "unlock": "ad",
+      "sky": ["#0A1A05", "#1F4D0F", "#6FBF1F", "#D4FF3A"],
+      "sun": "#F4FF9E",
+      "mountains": ["#4E8A1A", "#2E5A10", "#142B07"],
+      "mist": "#0B1A04",
+      "platformTop": "#233818",
+      "platformEdge": "#E4FF3A",
+      "platformUnder": ["#18280F", "#070D04"]
+    }
+  }
+}

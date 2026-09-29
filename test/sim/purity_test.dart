@@ -2,15 +2,17 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// Guards the rules that keep the simulation deterministic (see the PRD):
-/// no Flutter, no dart:math, and no `double` outside fixed.dart's
+/// Guards the rules that keep the simulation and the bot deterministic (see
+/// the PRD): no Flutter, no dart:math, and no `double` outside fixed.dart's
 /// conversion helpers.
 void main() {
-  final simFiles = Directory('lib/sim')
-      .listSync(recursive: true)
-      .whereType<File>()
-      .where((f) => f.path.endsWith('.dart'))
-      .toList();
+  final simFiles = [
+    for (final dir in ['lib/sim', 'lib/ai'])
+      ...Directory(dir)
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.dart')),
+  ];
 
   test('lib/sim exists and has files', () {
     expect(simFiles, isNotEmpty);

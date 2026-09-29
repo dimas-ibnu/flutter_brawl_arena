@@ -5,9 +5,11 @@ import 'package:brawl_arena/sim/input_frame.dart';
 import 'package:brawl_arena/sim/match_simulation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../helpers/fighters.dart';
+
 MatchSimulation _sim() => MatchSimulation(
   stage: StageDef.flatArena,
-  fighterDefs: const [FighterDef.knight, FighterDef.ranger],
+  fighterDefs: [knightDef, rangerDef],
 );
 
 const _idle = [InputFrame.none, InputFrame.none];
@@ -74,7 +76,7 @@ void main() {
         InputFrame.of([Button.right]),
       ]);
       final ranger = state.fighters[1];
-      expect(ranger.x, startX + FighterDef.ranger.walkSpeed.mulInt(10));
+      expect(ranger.x, startX + rangerDef.walkSpeed.mulInt(10));
       expect(ranger.facing, 1);
     });
 
@@ -91,7 +93,7 @@ void main() {
       expect(knight.y < sim.stage.groundY, isTrue);
       _run(sim, state, 120);
       expect(knight.grounded, isTrue);
-      expect(knight.airJumpsLeft, FighterDef.knight.airJumps);
+      expect(knight.airJumpsLeft, knightDef.airJumps);
     });
 
     test('up also jumps', () {
